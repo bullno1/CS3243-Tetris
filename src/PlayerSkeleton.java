@@ -1,22 +1,13 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 public class PlayerSkeleton {
 	public static void main(String[] args) {
 		State s = new State();
 
-		int numProcessors = Runtime.getRuntime().availableProcessors();
-		LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-		ExecutorService executorService = new ThreadPoolExecutor(numProcessors, numProcessors, 0, TimeUnit.MILLISECONDS, queue);
+		ForkJoinPool executorService = new ForkJoinPool();
 		PlayerSkeleton p = new PlayerSkeleton(executorService);
 
 		new TFrame(s);
@@ -42,15 +33,8 @@ public class PlayerSkeleton {
 		System.out.println("You have completed "+s.getRowsCleared()+" rows.");
 	}
 
-	public PlayerSkeleton(ExecutorService executorService) {
-		this.executorService = executorService;
-		MoveEvaluator[] evaluators = createEvaluators();
-		float[] weights = new float[evaluators.length];
-		Arrays.fill(weights, 1.0f);
-		this.evaluator = new WeightedSumEvaluator(evaluators, weights);
-	}
-
-	public MoveEvaluator[] createEvaluators() {
+	public static final MoveEvaluator[] EVALUATORS;
+	static {
 		ArrayList<MoveEvaluator> evaluators = new ArrayList<MoveEvaluator>();
 
 		//Column heights
@@ -58,28 +42,34 @@ public class PlayerSkeleton {
 			evaluators.add(new ColumnHeight(columnIndex));
 		}
 
-		return evaluators.toArray(new MoveEvaluator[evaluators.size()]);
+		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
 
-	public int pickMove(State s, int[][] legalMoves) throws InterruptedException, ExecutionException {
+	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
+		this.forkJoinPool = forkJoinPool;
+		float[] weights = new float[EVALUATORS.length];
+		Arrays.fill(weights, 1.0f);
+		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
+	}
+
+	public PlayerSkeleton(ForkJoinPool forkJoinPool, float[] weights) {
+		this.forkJoinPool = forkJoinPool;
+		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
+	}
+
+	public int pickMove(State s, int[][] legalMoves) {
 		int piece = s.getNextPiece();
-		ImmutableState currentState = new ImmutableState(s);
-		Collection<Callable<EvaluationResult>> evaluationTasks = createEvaluationTasks(currentState, piece, legalMoves);
-		List<Future<EvaluationResult>> evaluationResults = executorService.invokeAll(evaluationTasks);
-
-		float maxScore = -Float.MAX_VALUE;
-		int move = -1;
-
-		for(Future<EvaluationResult> resultFuture: evaluationResults) {
-			EvaluationResult result = resultFuture.get();
-			float score = result.getScore();
-			if(score > maxScore) {
-				maxScore = score;
-				move = result.getMove();
-			}
+		possibleMoves.clear();
+		for(int moveIndex = 0; moveIndex < legalMoves.length; ++moveIndex) {
+			int orientation = legalMoves[moveIndex][0];
+			int position = legalMoves[moveIndex][1];
+			possibleMoves.add(new Move(moveIndex, piece, orientation, position));
 		}
 
-		return move;
+		BestMoveFinder bestMoveFinder = new BestMoveFinder(evaluator, new ImmutableState(s));
+		MapReduceTask<Move, EvaluationResult, Integer> pickMoveTask =
+				new MapReduceTask<Move, EvaluationResult, Integer>(possibleMoves, bestMoveFinder);
+		return forkJoinPool.invoke(pickMoveTask);
 	}
 
 	public static void printState(int[][] field) {
@@ -92,21 +82,9 @@ public class PlayerSkeleton {
 		System.out.println("---");
 	}
 
-	private Collection<Callable<EvaluationResult>> createEvaluationTasks(ImmutableState state, int piece, int[][] legalMoves) {
-		evaluationTasks.clear();
-
-		for(int moveIndex = 0; moveIndex < legalMoves.length; ++moveIndex) {
-			int orientation = legalMoves[moveIndex][0];
-			int position = legalMoves[moveIndex][1];
-			evaluationTasks.add(new EvaluationTask(evaluator, state, moveIndex, piece, orientation, position));
-		}
-
-		return evaluationTasks;
-	}
-
-	private ExecutorService executorService;
+	private ForkJoinPool forkJoinPool;
 	private MoveEvaluator evaluator;
-	private ArrayList<Callable<EvaluationResult>> evaluationTasks = new ArrayList<Callable<EvaluationResult>>();
+	private ArrayList<Move> possibleMoves = new ArrayList<Move>();
 
 	//Nested classes because we are only allowed to use one file
 
@@ -349,30 +327,130 @@ public class PlayerSkeleton {
 		}
 	}
 
-	/**
-	 * Evaluates a move and return a score.
-	 * Use this with an ExecutorService
-	 */
-	public static class EvaluationTask implements Callable<EvaluationResult> {
-		public EvaluationTask(MoveEvaluator evaluator, ImmutableState state, int moveIndex, int piece, int orientation, int position) {
-			this.state = state;
-			this.moveIndex = moveIndex;
-			this.piece = piece;
-			this.orientation = orientation;
-			this.position = position;
-			this.evaluator = evaluator;
+	public interface MapReducer<SrcT, IntT, DstT> {
+		public IntT map(SrcT input);
+		public DstT reduce(Iterable<IntT> mapResults);
+	}
+
+	public class MapReduceTask<SrcT, IntT, DstT> extends ForkJoinTask<DstT> {
+		public MapReduceTask(Iterable<SrcT> inputs, MapReducer<SrcT, IntT, DstT> mapReducer) {
+			this.inputs = inputs;
+			this.mapReducer = mapReducer;
 		}
 
 		@Override
-		public EvaluationResult call() throws Exception {
-			MoveResult moveResult = state.move(piece, orientation, position);
-			float score = evaluator.evaluate(moveResult);
-			return new EvaluationResult(moveIndex, score);
+		protected boolean exec() {
+			//Map
+			ArrayList<ForkJoinTask<IntT>> mapTasks = new ArrayList<ForkJoinTask<IntT>>();
+			for(SrcT input: inputs) {
+				mapTasks.add(new Mapper(input));
+			}
+			invokeAll(mapTasks);
+
+			ArrayList<IntT> mapResults = new ArrayList<IntT>();
+			for(ForkJoinTask<IntT> task: mapTasks) {
+				mapResults.add(task.join());
+			}
+
+			//Reduce
+			setRawResult(mapReducer.reduce(mapResults));
+
+			return true;
 		}
 
-		private final ImmutableState state;
+		@Override
+		public DstT getRawResult() {
+			return output;
+		}
+
+		@Override
+		protected void setRawResult(DstT value) {
+			output = value;
+		}
+
+		private final Iterable<SrcT> inputs;
+		private DstT output = null;
+		private final MapReducer<SrcT, IntT, DstT> mapReducer;
+		private static final long serialVersionUID = 1L;
+
+		private class Mapper extends ForkJoinTask<IntT> {
+			public Mapper(SrcT input) {
+				this.input = input;
+			}
+
+			@Override
+			protected boolean exec() {
+				setRawResult(mapReducer.map(input));
+				return true;
+			}
+
+			@Override
+			public IntT getRawResult() {
+				return result;
+			}
+
+			@Override
+			protected void setRawResult(IntT value) {
+				result = value;
+			}
+
+			private IntT result = null;
+			private final SrcT input;
+			private static final long serialVersionUID = 1L;
+		}
+	}
+
+	private static class BestMoveFinder implements MapReducer<Move, EvaluationResult, Integer> {
+		public BestMoveFinder(MoveEvaluator evaluator, ImmutableState currentState) {
+			this.evaluator = evaluator;
+			this.currentState = currentState;
+		}
+
+		@Override
+		public EvaluationResult map(Move move) {
+			MoveResult moveResult = currentState.move(
+				move.getPiece(),
+				move.getOrientation(),
+				move.getPosition()
+			);
+			float score = evaluator.evaluate(moveResult);
+			return new EvaluationResult(move.getIndex(), score);
+		}
+
+		@Override
+		public Integer reduce(Iterable<EvaluationResult> results) {
+			float maxScore = -Float.MAX_VALUE;
+			int move = -1;
+
+			for(EvaluationResult result: results) {
+				float score = result.getScore();
+				if(score > maxScore) {
+					maxScore = score;
+					move = result.getMove();
+				}
+			}
+
+			return move;
+		}
+
 		private final MoveEvaluator evaluator;
-		private final int moveIndex;
+		private final ImmutableState currentState;
+	}
+
+	private static class Move {
+		public Move(int index, int piece, int orientation, int position) {
+			this.index = index;
+			this.piece = piece;
+			this.orientation = orientation;
+			this.position = position;
+		}
+
+		public int getIndex() { return index; }
+		public int getPiece() { return piece; }
+		public int getOrientation() { return orientation; }
+		public int getPosition() { return position; }
+
+		private final int index;
 		private final int piece;
 		private final int orientation;
 		private final int position;
@@ -388,7 +466,7 @@ public class PlayerSkeleton {
 	/**
 	 * A simple class to hold the evaluation result of a move
 	 */
-	public static class EvaluationResult {
+	private static class EvaluationResult {
 		public EvaluationResult(int move, float score) {
 			this.move = move;
 			this.score = score;
@@ -409,24 +487,16 @@ public class PlayerSkeleton {
 	/**
 	 * Result of a move, returned by ImmutableState.move
 	 */
-	public static class MoveResult {
+	private static class MoveResult {
 		public MoveResult(int field[][], int top[], boolean lost, int rowsCleared) {
 			this.state = new ImmutableState(field, top);
 			this.rowsCleared = rowsCleared;
 			this.lost = lost;
 		}
 
-		public ImmutableState getState() {
-			return state;
-		}
-
-		public int getRowsCleared() {
-			return rowsCleared;
-		}
-
-		public boolean hasLost() {
-			return lost;
-		}
+		public ImmutableState getState() { return state; }
+		public int getRowsCleared() { return rowsCleared; }
+		public boolean hasLost() { return lost; }
 
 		private final int rowsCleared;
 		private final boolean lost;
