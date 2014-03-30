@@ -81,6 +81,9 @@ public class PlayerSkeleton {
 
 	//Nested classes because we are only allowed to use one file
 
+	/**
+	 * Doesn't do anything, just return 0 for testing purposes
+	 */
 	public static class DummyEvaluator implements MoveEvaluator {
 		@Override
 		public int evaluate(MoveResult moveResult) {
@@ -88,13 +91,25 @@ public class PlayerSkeleton {
 		}
 	}
 
+	/**
+	 * A state that is more useful then the provided one.
+	 * It is immutable and suitable for parallel processing
+	 */
 	public static class ImmutableState {
+		/**
+		 * Construct a state which is identical to the built-in state
+		 */
 		public ImmutableState(State state) {
 			field = copyField(state.getField());
 			int[] srcTop = state.getTop();
 			top = Arrays.copyOf(srcTop, srcTop.length);
 		}
 
+		/**
+		 * Construct a state with the given field and top
+		 * @param field
+		 * @param top
+		 */
 		public ImmutableState(int[][] field, int[] top) {
 			this.field = field;
 			this.top = top;
@@ -108,7 +123,13 @@ public class PlayerSkeleton {
 			return top;
 		}
 
-		//returns false if you lose - true otherwise
+		/**
+		 * Make a move
+		 * @param piece
+		 * @param orient
+		 * @param slot
+		 * @return result of the move
+		 */
 		public MoveResult move(int piece, int orient, int slot) {
 			int[][] field = copyField(this.field);
 			int[] top = Arrays.copyOf(this.top, this.top.length);
@@ -261,6 +282,10 @@ public class PlayerSkeleton {
 		}
 	}
 
+	/**
+	 * Evaluates a move and return a score.
+	 * Use this with an ExecutorService
+	 */
 	public static class EvaluationTask implements Callable<EvaluationResult> {
 		public EvaluationTask(MoveEvaluator evaluator, ImmutableState state, int moveIndex, int piece, int orientation, int position) {
 			this.state = state;
@@ -286,10 +311,16 @@ public class PlayerSkeleton {
 		private final int position;
 	}
 
+	/**
+	 * A common interface for different kind of evaluator
+	 */
 	public static interface MoveEvaluator {
 		 public int evaluate(MoveResult moveResult);
 	}
 
+	/**
+	 * A simple class to hold the evaluation result of a move
+	 */
 	public static class EvaluationResult {
 		public EvaluationResult(int move, int score) {
 			this.move = move;
@@ -308,6 +339,9 @@ public class PlayerSkeleton {
 		private final int score;
 	}
 
+	/**
+	 * Result of a move, returned by ImmutableState.move
+	 */
 	public static class MoveResult {
 		public MoveResult(int field[][], int top[], boolean lost, int rowsCleared) {
 			this.state = new ImmutableState(field, top);
