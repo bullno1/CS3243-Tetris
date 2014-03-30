@@ -19,9 +19,17 @@ public class PlayerSkeleton {
 		ExecutorService executorService = new ThreadPoolExecutor(numProcessors, numProcessors, 0, TimeUnit.MILLISECONDS, queue);
 		PlayerSkeleton p = new PlayerSkeleton(executorService);
 
-		try	{
+		new TFrame(s);
+		try {
 			while(!s.hasLost()) {
 				s.makeMove(p.pickMove(s,s.legalMoves()));
+				s.draw();
+				s.drawNext(0,0);
+				try {
+					Thread.sleep(300);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 		catch(Exception e) {
@@ -30,6 +38,7 @@ public class PlayerSkeleton {
 		finally {
 			executorService.shutdown();
 		}
+
 		System.out.println("You have completed "+s.getRowsCleared()+" rows.");
 	}
 
