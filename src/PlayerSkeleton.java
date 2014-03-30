@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 
 public class PlayerSkeleton {
-	public static void main(String[] args) throws IOException, InterruptedException, ExecutionException {
+	public static void main(String[] args) {
 		State s = new State();
 
 		int numProcessors = Runtime.getRuntime().availableProcessors();
@@ -20,16 +20,29 @@ public class PlayerSkeleton {
 		ExecutorService executorService = new ThreadPoolExecutor(numProcessors, numProcessors, 0, TimeUnit.MILLISECONDS, queue);
 		PlayerSkeleton p = new PlayerSkeleton(executorService);
 
-		while(!s.hasLost()) {
-			s.makeMove(p.pickMove(s,s.legalMoves()));
+		try	{
+			while(!s.hasLost()) {
+				s.makeMove(p.pickMove(s,s.legalMoves()));
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			executorService.shutdown();
 		}
 		System.out.println("You have completed "+s.getRowsCleared()+" rows.");
-
-		executorService.shutdown();
 	}
 
 	public PlayerSkeleton(ExecutorService executorService) {
 		this.executorService = executorService;
+		MoveEvaluator[] evaluators = new MoveEvaluator[] {
+			new DummyEvaluator()
+		};
+		float[] weights = new float[] {
+			1.0f
+		};
+		this.evaluator = new WeightedSumEvaluator(evaluators, weights);
 	}
 
 	public int pickMove(State s, int[][] legalMoves) throws InterruptedException, ExecutionException {
@@ -38,12 +51,12 @@ public class PlayerSkeleton {
 		Collection<Callable<EvaluationResult>> evaluationTasks = createEvaluationTasks(currentState, piece, legalMoves);
 		List<Future<EvaluationResult>> evaluationResults = executorService.invokeAll(evaluationTasks);
 
-		int maxScore = Integer.MIN_VALUE;
+		float maxScore = -Float.MAX_VALUE;
 		int move = -1;
 
 		for(Future<EvaluationResult> resultFuture: evaluationResults) {
 			EvaluationResult result = resultFuture.get();
-			int score = result.getScore();
+			float score = result.getScore();
 			if(score > maxScore) {
 				maxScore = score;
 				move = result.getMove();
@@ -76,18 +89,43 @@ public class PlayerSkeleton {
 	}
 
 	private ExecutorService executorService;
-	private MoveEvaluator evaluator = new DummyEvaluator();
+	private MoveEvaluator evaluator;
 	private ArrayList<Callable<EvaluationResult>> evaluationTasks = new ArrayList<Callable<EvaluationResult>>();
 
 	//Nested classes because we are only allowed to use one file
+
+	/**
+	 * An evaluator which uses a weighted sum of features as score
+	 */
+	public static class WeightedSumEvaluator implements MoveEvaluator {
+		public WeightedSumEvaluator(MoveEvaluator[] evaluators, float[] weights) {
+			this.evaluators = evaluators;
+			this.weights = weights;
+		}
+
+		@Override
+		public float evaluate(MoveResult moveResult) {
+			float sum = 0.0f;
+
+			for(int i = 0; i < evaluators.length; ++i) {
+				float score = evaluators[i].evaluate(moveResult);
+				sum += score * weights[i];
+			}
+
+			return sum;
+		}
+
+		private final MoveEvaluator[] evaluators;
+		private final float[] weights;
+	}
 
 	/**
 	 * Doesn't do anything, just return 0 for testing purposes
 	 */
 	public static class DummyEvaluator implements MoveEvaluator {
 		@Override
-		public int evaluate(MoveResult moveResult) {
-			return 0;
+		public float evaluate(MoveResult moveResult) {
+			return 0.0f;
 		}
 	}
 
@@ -299,7 +337,7 @@ public class PlayerSkeleton {
 		@Override
 		public EvaluationResult call() throws Exception {
 			MoveResult moveResult = state.move(piece, orientation, position);
-			int score = evaluator.evaluate(moveResult);
+			float score = evaluator.evaluate(moveResult);
 			return new EvaluationResult(moveIndex, score);
 		}
 
@@ -315,14 +353,14 @@ public class PlayerSkeleton {
 	 * A common interface for different kind of evaluator
 	 */
 	public static interface MoveEvaluator {
-		 public int evaluate(MoveResult moveResult);
+		 public float evaluate(MoveResult moveResult);
 	}
 
 	/**
 	 * A simple class to hold the evaluation result of a move
 	 */
 	public static class EvaluationResult {
-		public EvaluationResult(int move, int score) {
+		public EvaluationResult(int move, float score) {
 			this.move = move;
 			this.score = score;
 		}
@@ -331,12 +369,12 @@ public class PlayerSkeleton {
 			return move;
 		}
 
-		public int getScore() {
+		public float getScore() {
 			return score;
 		}
 
 		private final int move;
-		private final int score;
+		private final float score;
 	}
 
 	/**
