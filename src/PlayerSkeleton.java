@@ -9,7 +9,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.io.IOException;
 
 public class PlayerSkeleton {
 	public static void main(String[] args) {
@@ -36,13 +35,21 @@ public class PlayerSkeleton {
 
 	public PlayerSkeleton(ExecutorService executorService) {
 		this.executorService = executorService;
-		MoveEvaluator[] evaluators = new MoveEvaluator[] {
-			new DummyEvaluator()
-		};
-		float[] weights = new float[] {
-			1.0f
-		};
+		MoveEvaluator[] evaluators = createEvaluators();
+		float[] weights = new float[evaluators.length];
+		Arrays.fill(weights, 1.0f);
 		this.evaluator = new WeightedSumEvaluator(evaluators, weights);
+	}
+
+	public MoveEvaluator[] createEvaluators() {
+		ArrayList<MoveEvaluator> evaluators = new ArrayList<MoveEvaluator>();
+
+		//Column heights
+		for(int columnIndex = 0; columnIndex < State.COLS; ++columnIndex) {
+			evaluators.add(new ColumnHeight(columnIndex));
+		}
+
+		return evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
 
 	public int pickMove(State s, int[][] legalMoves) throws InterruptedException, ExecutionException {
@@ -127,6 +134,19 @@ public class PlayerSkeleton {
 		public float evaluate(MoveResult moveResult) {
 			return 0.0f;
 		}
+	}
+
+	public static class ColumnHeight implements MoveEvaluator {
+		public ColumnHeight(int columnIndex) {
+			this.columnIndex = columnIndex;
+		}
+
+		@Override
+		public float evaluate(MoveResult moveResult) {
+			return -(float)moveResult.getState().getTop()[columnIndex];//column height is a negative trait
+		}
+
+		private int columnIndex;
 	}
 
 	/**
