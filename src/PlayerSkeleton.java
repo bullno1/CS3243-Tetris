@@ -51,7 +51,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 1.5627513f, 2.4937541f, 2.5737576f, 2.2432353f, 1.2400658f, 2.9490452f, 0.8962755f, 2.9361923f, 0.7618835f, 1.466425f, 3.571728f }
+		{ 33.519493f, 26.983864f, 27.579832f, 39.10369f, 37.06415f, 45.665203f, 40.899426f, 41.192616f, 92.94577f, 35.54414f, 67.767006f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}

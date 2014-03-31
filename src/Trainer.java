@@ -12,7 +12,7 @@ public class Trainer {
 			new GeneticAlgorithmConfig(forkJoinPool)
 			    .setCrossoverRate(0.6f)
 			    .setMutationRate(0.1f)
-			    .setPopulationSize(20);
+			    .setPopulationSize(40);
 
 		try {
 			SortedSet<GeneFitnessPair<WeightSet>> bestGenes =

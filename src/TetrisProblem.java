@@ -13,7 +13,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		WeightSet gene = newGene();
 		float[] weights = gene.getWeights();
 		for(int weightIndex = 0; weightIndex < weights.length; ++weightIndex) {
-			weights[weightIndex] = random.nextFloat() * 4;
+			weights[weightIndex] = random.nextFloat() * 100;
 		}
 
 		return new WeightSet(weights);
@@ -29,7 +29,15 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			}
 		}
 
-		return maxScore >= 7.f;
+		if(maxScore > bestScore) {
+			bestScore = maxScore;
+			numStagnations = 0;
+			return false;
+		}
+		else {
+			++numStagnations;
+			return numStagnations > 100;
+		}
 	}
 
 	@Override
@@ -42,7 +50,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 	@Override
 	public void mutate(WeightSet gene, int mutatedChromosomeIndex) {
-		gene.getWeights()[mutatedChromosomeIndex] = random.nextFloat() * 4;
+		gene.getWeights()[mutatedChromosomeIndex] = random.nextFloat() * 100;
 	}
 
 	@Override
@@ -74,6 +82,8 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	private ForkJoinPool forkJoinPool;
 	private PlayerSkeleton.MapReduce mapReduce;
 	private Random random = new Random();
+	private float bestScore = -Float.MAX_VALUE;
+	private int numStagnations = 0;
 
 	private final PlayerSkeleton.MapFunc<WeightSet, Float> EVAL_FUNC = new PlayerSkeleton.MapFunc<WeightSet, Float>() {
 		@Override
