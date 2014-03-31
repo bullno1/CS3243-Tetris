@@ -46,30 +46,28 @@ public class PlayerSkeleton {
 	}
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
-		this.forkJoinPool = forkJoinPool;
+		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[EVALUATORS.length];
 		Arrays.fill(weights, 1.0f);
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool, float[] weights) {
-		this.forkJoinPool = forkJoinPool;
+		this.mapReduce = new MapReduce(forkJoinPool);
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
 	public int pickMove(State s, int[][] legalMoves) {
 		int piece = s.getNextPiece();
+		ImmutableState currentState = new ImmutableState(s);
 		possibleMoves.clear();
 		for(int moveIndex = 0; moveIndex < legalMoves.length; ++moveIndex) {
 			int orientation = legalMoves[moveIndex][0];
 			int position = legalMoves[moveIndex][1];
-			possibleMoves.add(new Move(moveIndex, piece, orientation, position));
+			possibleMoves.add(new Move(currentState, moveIndex, piece, orientation, position));
 		}
 
-		BestMoveFinder bestMoveFinder = new BestMoveFinder(evaluator, new ImmutableState(s));
-		MapReduceTask<Move, EvaluationResult, Integer> pickMoveTask =
-				new MapReduceTask<Move, EvaluationResult, Integer>(possibleMoves, bestMoveFinder);
-		return forkJoinPool.invoke(pickMoveTask);
+		return mapReduce.mapReduce(EVAL_MOVE_FUNC, PICK_MOVE_FUNC, possibleMoves);
 	}
 
 	public static void printState(int[][] field) {
@@ -82,12 +80,38 @@ public class PlayerSkeleton {
 		System.out.println("---");
 	}
 
-	private ForkJoinPool forkJoinPool;
 	private MoveEvaluator evaluator;
+	private MapReduce mapReduce;
 	private ArrayList<Move> possibleMoves = new ArrayList<Move>();
 
-	//Nested classes because we are only allowed to use one file
+	private final MapFunc<Move, EvaluationResult> EVAL_MOVE_FUNC = new MapFunc<Move, EvaluationResult>() {
+		@Override
+		public EvaluationResult map(Move move) {
+			ImmutableState state = move.getState();
+			MoveResult moveResult = state.move(move.getPiece(), move.getOrientation(), move.getPosition());
+			float score = evaluator.map(moveResult);
+			return new EvaluationResult(move.getIndex(), score);
+		}
+	};
 
+	private static final ReduceFunc<EvaluationResult, Integer> PICK_MOVE_FUNC = new ReduceFunc<EvaluationResult, Integer>() {
+		public Integer reduce(Iterable<EvaluationResult> results) {
+			float maxScore = -Float.MAX_VALUE;
+			int move = -1;
+
+			for(EvaluationResult result: results) {
+				float score = result.getScore();
+				if(score > maxScore) {
+					maxScore = score;
+					move = result.getMove();
+				}
+			}
+
+			return move;
+		}
+	};
+
+	//Nested classes because we are only allowed to use one file
 	/**
 	 * An evaluator which uses a weighted sum of features as score
 	 */
@@ -98,11 +122,11 @@ public class PlayerSkeleton {
 		}
 
 		@Override
-		public float evaluate(MoveResult moveResult) {
+		public Float map(MoveResult moveResult) {
 			float sum = 0.0f;
 
 			for(int i = 0; i < evaluators.length; ++i) {
-				float score = evaluators[i].evaluate(moveResult);
+				float score = evaluators[i].map(moveResult);
 				sum += score * weights[i];
 			}
 
@@ -118,7 +142,7 @@ public class PlayerSkeleton {
 	 */
 	public static class DummyEvaluator implements MoveEvaluator {
 		@Override
-		public float evaluate(MoveResult moveResult) {
+		public Float map(MoveResult moveResult) {
 			return 0.0f;
 		}
 	}
@@ -129,7 +153,7 @@ public class PlayerSkeleton {
 		}
 
 		@Override
-		public float evaluate(MoveResult moveResult) {
+		public Float map(MoveResult moveResult) {
 			return -(float)moveResult.getState().getTop()[columnIndex];//column height is a negative trait
 		}
 
@@ -327,15 +351,34 @@ public class PlayerSkeleton {
 		}
 	}
 
-	public interface MapReducer<SrcT, IntT, DstT> {
-		public IntT map(SrcT input);
-		public DstT reduce(Iterable<IntT> mapResults);
+	public static class MapReduce {
+		public MapReduce(ForkJoinPool forkJoinPool) {
+			this.forkJoinPool = forkJoinPool;
+		}
+
+		public <SrcT, IntT, DstT> DstT mapReduce(
+				MapFunc<SrcT, IntT> mapFunc, ReduceFunc<IntT, DstT> reduceFunc, Iterable<SrcT> inputs) {
+
+			return forkJoinPool.invoke(new MapReduceTask<SrcT, IntT, DstT>(mapFunc, reduceFunc, inputs));
+		}
+
+		private final ForkJoinPool forkJoinPool;
 	}
 
-	public class MapReduceTask<SrcT, IntT, DstT> extends ForkJoinTask<DstT> {
-		public MapReduceTask(Iterable<SrcT> inputs, MapReducer<SrcT, IntT, DstT> mapReducer) {
+	public static interface MapFunc<SrcT, DstT> {
+		public DstT map(SrcT input);
+	}
+
+	public static interface ReduceFunc<SrcT, DstT> {
+		public DstT reduce(Iterable<SrcT> inputs);
+	}
+
+	public static class MapReduceTask<SrcT, IntT, DstT> extends ForkJoinTask<DstT> {
+		public MapReduceTask(
+				MapFunc<SrcT, IntT> mapFunc, ReduceFunc<IntT, DstT> reduceFunc, Iterable<SrcT> inputs) {
 			this.inputs = inputs;
-			this.mapReducer = mapReducer;
+			this.mapFunc = mapFunc;
+			this.reduceFunc = reduceFunc;
 		}
 
 		@Override
@@ -343,7 +386,7 @@ public class PlayerSkeleton {
 			//Map
 			ArrayList<ForkJoinTask<IntT>> mapTasks = new ArrayList<ForkJoinTask<IntT>>();
 			for(SrcT input: inputs) {
-				mapTasks.add(new Mapper(input));
+				mapTasks.add(new MapTask(input));
 			}
 			invokeAll(mapTasks);
 
@@ -353,7 +396,7 @@ public class PlayerSkeleton {
 			}
 
 			//Reduce
-			setRawResult(mapReducer.reduce(mapResults));
+			setRawResult(reduceFunc.reduce(mapResults));
 
 			return true;
 		}
@@ -370,86 +413,59 @@ public class PlayerSkeleton {
 
 		private final Iterable<SrcT> inputs;
 		private DstT output = null;
-		private final MapReducer<SrcT, IntT, DstT> mapReducer;
+		private MapFunc<SrcT, IntT> mapFunc;
+		private ReduceFunc<IntT, DstT> reduceFunc;
 		private static final long serialVersionUID = 1L;
 
-		private class Mapper extends ForkJoinTask<IntT> {
-			public Mapper(SrcT input) {
+		private class MapTask extends ForkJoinTask<IntT> {
+			public MapTask(SrcT input) {
 				this.input = input;
 			}
 
 			@Override
 			protected boolean exec() {
-				setRawResult(mapReducer.map(input));
+				setRawResult(mapFunc.map(input));
 				return true;
 			}
 
 			@Override
 			public IntT getRawResult() {
-				return result;
+				return output;
 			}
 
 			@Override
 			protected void setRawResult(IntT value) {
-				result = value;
+				output = value;
 			}
 
-			private IntT result = null;
+			private IntT output = null;
 			private final SrcT input;
+
 			private static final long serialVersionUID = 1L;
 		}
 	}
 
-	private static class BestMoveFinder implements MapReducer<Move, EvaluationResult, Integer> {
-		public BestMoveFinder(MoveEvaluator evaluator, ImmutableState currentState) {
-			this.evaluator = evaluator;
-			this.currentState = currentState;
-		}
-
-		@Override
-		public EvaluationResult map(Move move) {
-			MoveResult moveResult = currentState.move(
-				move.getPiece(),
-				move.getOrientation(),
-				move.getPosition()
-			);
-			float score = evaluator.evaluate(moveResult);
-			return new EvaluationResult(move.getIndex(), score);
-		}
-
-		@Override
-		public Integer reduce(Iterable<EvaluationResult> results) {
-			float maxScore = -Float.MAX_VALUE;
-			int move = -1;
-
-			for(EvaluationResult result: results) {
-				float score = result.getScore();
-				if(score > maxScore) {
-					maxScore = score;
-					move = result.getMove();
-				}
-			}
-
-			return move;
-		}
-
-		private final MoveEvaluator evaluator;
-		private final ImmutableState currentState;
-	}
+	/**
+	 * A common interface for different kind of evaluator
+	 */
+	public interface MoveEvaluator extends MapFunc<MoveResult, Float> {}
 
 	private static class Move {
-		public Move(int index, int piece, int orientation, int position) {
+		public Move(ImmutableState state, int index, int piece, int orientation, int position) {
+			this.state = state;
 			this.index = index;
 			this.piece = piece;
 			this.orientation = orientation;
 			this.position = position;
 		}
 
+		public ImmutableState getState() { return state; }
 		public int getIndex() { return index; }
 		public int getPiece() { return piece; }
 		public int getOrientation() { return orientation; }
 		public int getPosition() { return position; }
 
+		private final ImmutableState state;
 		private final int index;
 		private final int piece;
 		private final int orientation;
@@ -457,16 +473,9 @@ public class PlayerSkeleton {
 	}
 
 	/**
-	 * A common interface for different kind of evaluator
-	 */
-	public static interface MoveEvaluator {
-		 public float evaluate(MoveResult moveResult);
-	}
-
-	/**
 	 * A simple class to hold the evaluation result of a move
 	 */
-	private static class EvaluationResult {
+	public static class EvaluationResult {
 		public EvaluationResult(int move, float score) {
 			this.move = move;
 			this.score = score;
@@ -487,7 +496,7 @@ public class PlayerSkeleton {
 	/**
 	 * Result of a move, returned by ImmutableState.move
 	 */
-	private static class MoveResult {
+	public static class MoveResult {
 		public MoveResult(int field[][], int top[], boolean lost, int rowsCleared) {
 			this.state = new ImmutableState(field, top);
 			this.rowsCleared = rowsCleared;
