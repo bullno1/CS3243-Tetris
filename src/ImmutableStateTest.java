@@ -31,7 +31,7 @@ public class ImmutableStateTest {
 	@Test
 	public void consistencyTest() {
 		Random random = new Random();
-		for(int i = 0; i < 10000; ++i) {//Play 10000 games
+		for(int i = 0; i < 1000; ++i) {//Play 10000 games
 			PlayerSkeleton.MoveResult lastResult = null;
 			int lastScore = 0;
 			while(!mutableState.hasLost()) {
@@ -60,16 +60,8 @@ public class ImmutableStateTest {
 	}
 
 	private static void assertStateEquals(State mutableState, PlayerSkeleton.ImmutableState immutableState) {
-		int[][] field = mutableState.getField();
-		int[][] field2 = immutableState.getField();
-		for(int x = 0; x < State.COLS; ++x) {
-			for(int y = 0; y < State.ROWS; ++y) {
-				boolean notEmpty = field[y][x] != 0;
-				boolean notEmpty2 = field2[y][x] != 0;
-				assertEquals(notEmpty, notEmpty2);
-			}
-		}
-
+		assertEquals(mutableState.getTurnNumber(), immutableState.getTurn());
+		assertArrayEquals(mutableState.getField(), immutableState.getField());
 		assertArrayEquals(mutableState.getTop(), immutableState.getTop());
 	}
 }

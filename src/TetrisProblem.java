@@ -67,13 +67,13 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		else {
 			++numLostGenerations;
 			System.out.print(".");
-			return numLostGenerations > 100;
+			return numLostGenerations > 20;
 		}
 	}
 
 	@Override
 	public float evaluateFitness(WeightSet gene) {
-		final int NUM_GAMES = 20;
+		final int NUM_GAMES = 50;
 		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
 		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(gene); }
 		return mapReduce.mapReduce(EVAL_FUNC, AVG_SCORE, inputs);
@@ -146,6 +146,21 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 				state.makeMove(player.pickMove(state, state.legalMoves()));
 			}
 			return (float)state.getRowsCleared();
+		}
+	};
+	
+	private final PlayerSkeleton.ReduceFunc<Float, Float> PERCENTILE_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
+		@Override
+		public Float reduce(Iterable<Float> inputs) {
+			ArrayList<Float> scores = new ArrayList<Float>();
+			for(Float score: inputs) {
+				scores.add(score);
+			}
+
+			float PERCENTILE = 0.5f;
+			int index = Math.round(scores.size() * PERCENTILE) - 1;
+
+			return scores.get(index);
 		}
 	};
 

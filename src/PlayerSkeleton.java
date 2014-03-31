@@ -39,19 +39,22 @@ public class PlayerSkeleton {
 		ArrayList<MoveEvaluator> evaluators = new ArrayList<MoveEvaluator>();
 
 		//Column heights
-		for(int columnIndex = 0; columnIndex < State.COLS; ++columnIndex) {
+		/*for(int columnIndex = 0; columnIndex < State.COLS; ++columnIndex) {
 			evaluators.add(new ColumnHeight(columnIndex));
-		}
+		}*/
 
 		//Column height differences
-		for(int columnIndex = 0; columnIndex < State.COLS - 1; ++columnIndex) {
+		/*for(int columnIndex = 0; columnIndex < State.COLS - 1; ++columnIndex) {
 			evaluators.add(new ColumnDiff(columnIndex, columnIndex + 1));
-		}
+		}*/
 
+		evaluators.add(new Roughness());
 		evaluators.add(new MaxColumnHeight());
 		evaluators.add(new NumRowsCleared());
 		evaluators.add(new HasLost());
 		evaluators.add(new NumFaults());
+		evaluators.add(new MeanHeight());
+		evaluators.add(new NumWells());
 
 		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
@@ -59,7 +62,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 465.60138f, 910.8662f, 791.8002f, 911.30994f, 656.01404f, 955.58997f, 878.85565f, 609.3857f, 939.4019f, 86.24357f, 946.63824f, 338.55994f, 405.60086f, 63.71796f, 736.44495f, 594.69525f, 321.12985f, 397.70044f, 709.8562f, 886.3371f, 416.87656f, 797.57544f, 509.06497f }
+		{ 841.43677f, 600.0143f, 797.9413f, 355.19208f, 630.6689f, 805.7945f, 124.335526f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -159,17 +162,62 @@ public class PlayerSkeleton {
 		}
 	}
 
-	public static class ColumnHeight implements MoveEvaluator {
-		public ColumnHeight(int columnIndex) {
-			this.columnIndex = columnIndex;
-		}
-
+	public static class NumWells implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult moveResult) {
-			return -(float)moveResult.getState().getTop()[columnIndex];//column height is a negative trait
-		}
+			int[] top = moveResult.getState().getTop();
 
-		private int columnIndex;
+			int numWells = 0;
+
+			for(int column = 1; column < top.length - 1; ++column) {
+				if(top[column - 1] < top[column] && top[column] < top[column + 1]) {
+					++numWells;
+				}
+			}
+			
+			if(top[0] < top[1]) ++numWells;
+			if(top[top.length - 1] < top[top.length - 2]) ++numWells;
+
+			return -(float)numWells;
+		}
+	}
+	
+	public static class DeepestWell implements MoveEvaluator {
+		public Float map(MoveResult moveResult) {
+			int maxDepth = Integer.MIN_VALUE;
+			int[] top = moveResult.getState().getTop();
+
+			for(int column = 1; column < top.length - 1; ++column) {
+				if(top[column - 1] < top[column] && top[column] < top[column + 1]) {
+					int depth = Math.max(top[column] - top[column - 1], top[column + 1] - top[column]);
+					maxDepth = Math.max(maxDepth, depth);
+				}
+			}
+			
+			if(top[0] < top[1]) {
+				maxDepth = Math.max(maxDepth, top[1] - top[0]);
+			}
+
+			if(top[top.length - 1] < top[top.length - 2]) {
+				maxDepth = Math.max(maxDepth, top[top.length - 2] - top[top.length - 1]);
+			}
+
+			return -(float)maxDepth;
+		}
+	}
+
+	public static class MeanHeight implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			int[] top = result.getState().getTop();
+
+			int sum = 0;
+			for(int height: top) {
+				sum += height;
+			}
+
+			return -(float)sum / (float)top.length;
+		}
 	}
 
 	public static class MaxColumnHeight implements MoveEvaluator {
@@ -209,8 +257,8 @@ public class PlayerSkeleton {
 			int[][] field = result.getState().getField();
 			int numFaults = 0;
 
-			for(int y = State.ROWS - 2; y >= 0; --y) {
-				for(int x = 0; x < State.COLS; ++x) {
+			for(int x = 0; x < State.COLS; ++x) {
+				for(int y = State.ROWS - 2; y >= 0; --y) {
 					if(field[y][x] == 0 && field[y + 1][x] !=0) {
 						++numFaults;
 					}
@@ -218,6 +266,18 @@ public class PlayerSkeleton {
 			}
 
 			return -(float)numFaults * 10;
+		}
+	}
+
+	public static class Roughness implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			int[] top = result.getState().getTop();
+			int roughness = 0;
+			for(int i = 0; i < top.length - 1; ++i) {
+				roughness += Math.abs(top[i] - top[i + 1]);
+			}
+			return -(float)roughness;
 		}
 	}
 
@@ -249,16 +309,19 @@ public class PlayerSkeleton {
 			field = copyField(state.getField());
 			int[] srcTop = state.getTop();
 			top = Arrays.copyOf(srcTop, srcTop.length);
+			turn = state.getTurnNumber();
 		}
 
 		/**
 		 * Construct a state with the given field and top
 		 * @param field
 		 * @param top
+		 * @param turn
 		 */
-		public ImmutableState(int[][] field, int[] top) {
+		public ImmutableState(int[][] field, int[] top, int turn) {
 			this.field = field;
 			this.top = top;
+			this.turn = turn;
 		}
 
 		public int[][] getField() {
@@ -267,6 +330,10 @@ public class PlayerSkeleton {
 
 		public int[] getTop() {
 			return top;
+		}
+		
+		public int getTurn() {
+			return turn;
 		}
 
 		/**
@@ -279,6 +346,7 @@ public class PlayerSkeleton {
 		public MoveResult move(int piece, int orient, int slot) {
 			int[][] field = copyField(this.field);
 			int[] top = Arrays.copyOf(this.top, this.top.length);
+			int turn = this.turn + 1;
 
 			//height if the first column makes contact
 			int height = top[slot] - pBottom[piece][orient][0];
@@ -289,14 +357,14 @@ public class PlayerSkeleton {
 
 			//check if game ended
 			if(height + pHeight[piece][orient] >= ROWS) {
-				return new MoveResult(field, top, true, 0);
+				return new MoveResult(field, top, turn, true, 0);
 			}
 
 			//for each column in the piece - fill in the appropriate blocks
 			for(int i = 0; i < pWidth[piece][orient]; i++) {
 				//from bottom to top of brick
 				for(int h = height+pBottom[piece][orient][i]; h < height+pTop[piece][orient][i]; h++) {
-					field[h][i+slot] = 1;
+					field[h][i+slot] = turn;
 				}
 			}
 
@@ -333,7 +401,7 @@ public class PlayerSkeleton {
 				}
 			}
 
-			return new MoveResult(field, top, false, rowsCleared);
+			return new MoveResult(field, top, turn, false, rowsCleared);
 		}
 
 		private static int[][] copyField(int[][] srcField) {
@@ -350,6 +418,7 @@ public class PlayerSkeleton {
 
 		private final int[][] field;
 		private final int[] top;
+		private final int turn;
 
 		//static
 		public static final int COLS = 10;
@@ -607,8 +676,8 @@ public class PlayerSkeleton {
 	 * Result of a move, returned by ImmutableState.move
 	 */
 	public static class MoveResult {
-		public MoveResult(int field[][], int top[], boolean lost, int rowsCleared) {
-			this.state = new ImmutableState(field, top);
+		public MoveResult(int field[][], int top[], int turn, boolean lost, int rowsCleared) {
+			this.state = new ImmutableState(field, top, turn);
 			this.rowsCleared = rowsCleared;
 			this.lost = lost;
 		}
