@@ -76,7 +76,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		final int NUM_GAMES = 20;
 		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
 		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(gene); }
-		return mapReduce.mapReduce(EVAL_FUNC, REDUCE_FUNC, inputs);
+		return mapReduce.mapReduce(EVAL_FUNC, MIN_SCORE, inputs);
 	}
 
 	@Override
@@ -149,7 +149,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		}
 	};
 
-	private final PlayerSkeleton.ReduceFunc<Float, Float> REDUCE_FUNC = new PlayerSkeleton.ReduceFunc<Float, Float>() {
+	private final PlayerSkeleton.ReduceFunc<Float, Float> AVG_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
 		@Override
 		public Float reduce(Iterable<Float> inputs) {
 			int numGames = 0;
@@ -161,6 +161,21 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			}
 
 			return sum / numGames;
+		}
+	};
+
+	private final PlayerSkeleton.ReduceFunc<Float, Float> MIN_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
+		@Override
+		public Float reduce(Iterable<Float> inputs) {
+			Float minScore = Float.MAX_VALUE;
+
+			for(Float score: inputs) {
+				if(score < minScore) {
+					minScore = score;
+				}
+			}
+
+			return minScore;
 		}
 	};
 }

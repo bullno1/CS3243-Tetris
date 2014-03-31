@@ -44,10 +44,9 @@ public class PlayerSkeleton {
 		}
 
 		//Column height differences
-		/*for(int columnIndex = 0; columnIndex < State.COLS - 1; ++columnIndex) {
+		for(int columnIndex = 0; columnIndex < State.COLS - 1; ++columnIndex) {
 			evaluators.add(new ColumnDiff(columnIndex, columnIndex + 1));
-			evaluators.add(new ColumnDiff(columnIndex + 1, columnIndex));
-		}*/
+		}
 
 		evaluators.add(new MaxColumnHeight());
 		evaluators.add(new NumRowsCleared());
@@ -60,7 +59,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 141.15918f, 304.24768f, 201.45792f, 138.59904f, 960.8583f, 535.3489f, 276.74084f, 333.11343f, 298.93433f, 57.652115f, 988.6826f, 910.4831f, 378.3983f, 624.7744f }
+		{ 714.2443f, 682.6591f, 158.30809f, 798.1245f, 723.04803f, 903.5107f, 311.32187f, 909.9456f, 119.21692f, 873.7069f, 253.98344f, 418.36185f, 930.38226f, 214.38527f, 279.96838f, 735.7997f, 687.60077f, 439.1053f, 626.21014f, 654.2828f, 396.79337f, 456.8771f, 917.01514f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -231,7 +230,7 @@ public class PlayerSkeleton {
 		@Override
 		public Float map(MoveResult result) {
 			int[] top = result.getState().getTop();
-			return (float)(top[columnA] - top[columnB]);
+			return -(float)Math.abs(top[columnA] - top[columnB]);
 		}
 
 		private final int columnA;
