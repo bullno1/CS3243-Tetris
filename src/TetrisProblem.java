@@ -29,7 +29,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			}
 		}
 
-		return maxScore > 1.f;
+		return maxScore >= 7.f;
 	}
 
 	@Override

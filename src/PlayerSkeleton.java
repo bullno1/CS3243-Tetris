@@ -43,13 +43,16 @@ public class PlayerSkeleton {
 			evaluators.add(new ColumnHeight(columnIndex));
 		}
 
+		evaluators.add(new MaxColumnHeight());
+
 		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 0.66822934f, 1.2253766f, 0.7809124f, 1.0725532f, 1.1921268f, 3.9741669f, 2.598425f, 0.51265097f, 0.7852218f, 1.1533034f};
+		{ 1.5627513f, 2.4937541f, 2.5737576f, 2.2432353f, 1.2400658f, 2.9490452f, 0.8962755f, 2.9361923f, 0.7618835f, 1.466425f, 3.571728f }
+		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
@@ -159,6 +162,23 @@ public class PlayerSkeleton {
 		}
 
 		private int columnIndex;
+	}
+
+	public static class MaxColumnHeight implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			int[] top = result.getState().getTop();
+
+			int maxHeight = Integer.MIN_VALUE;
+			for(int column = 0; column < top.length; ++column) {
+				int height = top[column];
+				if(height > maxHeight) {
+					maxHeight = height;
+				}
+			}
+
+			return -(float)maxHeight;
+		}
 	}
 
 	/**
