@@ -1,4 +1,3 @@
-import java.util.SortedSet;
 import java.util.concurrent.ForkJoinPool;
 
 /**
@@ -6,18 +5,18 @@ import java.util.concurrent.ForkJoinPool;
  */
 public class Trainer {
 	public static void main(String[] args) {
+		System.out.println("Number of features: " + PlayerSkeleton.EVALUATORS.length);
+
 		ForkJoinPool forkJoinPool = new ForkJoinPool();
 
 		GeneticAlgorithmConfig config =
 			new GeneticAlgorithmConfig(forkJoinPool)
-			    .setCrossoverRate(0.6f)
-			    .setMutationRate(0.1f)
-			    .setPopulationSize(40);
-
+			    .setCrossoverRate(0.7f)
+			    .setMutationRate(0.01f)
+			    .setPopulationSize(100);
 		try {
-			SortedSet<GeneFitnessPair<WeightSet>> bestGenes =
+			GeneFitnessPair<WeightSet> fittest =
 					GeneticAlgorithm.run(new TetrisProblem(forkJoinPool), config);
-			GeneFitnessPair<WeightSet> fittest = bestGenes.last();
 
 			System.out.println();
 			System.out.println("Best score: " + fittest.getFitness());

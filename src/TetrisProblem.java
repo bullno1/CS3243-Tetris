@@ -13,7 +13,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		WeightSet gene = newGene();
 		float[] weights = gene.getWeights();
 		for(int weightIndex = 0; weightIndex < weights.length; ++weightIndex) {
-			weights[weightIndex] = randomGene();
+			weights[weightIndex] = randomChromosome();
 		}
 
 		return new WeightSet(weights);
@@ -45,7 +45,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 	@Override
 	public float evaluateFitness(WeightSet gene) {
-		final int NUM_GAMES = 5;
+		final int NUM_GAMES = 20;
 		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
 		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(gene); }
 		return mapReduce.mapReduce(EVAL_FUNC, REDUCE_FUNC, inputs);
@@ -53,7 +53,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 	@Override
 	public void mutate(WeightSet gene, int mutatedChromosomeIndex) {
-		gene.getWeights()[mutatedChromosomeIndex] = randomGene();
+		gene.getWeights()[mutatedChromosomeIndex] = randomChromosome();
 	}
 
 	@Override
@@ -77,7 +77,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		return new WeightSet[] { children1, children2 };
 	}
 
-	private float randomGene() {
+	private float randomChromosome() {
 		return random.nextFloat() * 100.0f;
 	}
 
@@ -107,15 +107,15 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	private final PlayerSkeleton.ReduceFunc<Float, Float> REDUCE_FUNC = new PlayerSkeleton.ReduceFunc<Float, Float>() {
 		@Override
 		public Float reduce(Iterable<Float> inputs) {
-			Float worseScore = Float.MAX_VALUE;
+			int numGames = 0;
+			float sum = 0.0f;
 
 			for(Float score: inputs) {
-				if(score.compareTo(worseScore) < 0) {
-					worseScore = score;
-				}
+				sum += score;
+				++numGames;
 			}
 
-			return worseScore;
+			return sum / numGames;
 		}
 	};
 }

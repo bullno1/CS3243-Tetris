@@ -1,14 +1,11 @@
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Random;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 /**
  * Trains and optimizes weights for features
  */
 public class GeneticAlgorithm {
-	public static <T extends Gene> SortedSet<GeneFitnessPair<T>> run(
+	public static <T extends Gene> GeneFitnessPair<T> run(
 			ProblemDomain<T> problemDomain, GeneticAlgorithmConfig config) {
 
 		//Initialize
@@ -19,6 +16,8 @@ public class GeneticAlgorithm {
 		float mutationRate = config.getMutationRate();
 		PlayerSkeleton.MapReduce mapReduce = new PlayerSkeleton.MapReduce(config.getForkJoinPool());
 		PlayerSkeleton.MapFunc<T, GeneFitnessPair<T>> fitnessFunction = new FitnessFunction<T>(problemDomain);
+		GeneFitnessPair<T> bestGene = null;
+		float maxScore = -Float.MAX_VALUE;
 
 		//Create a population
 		ArrayList<T> population = new ArrayList<T>();
@@ -62,11 +61,18 @@ public class GeneticAlgorithm {
 					problemDomain.mutate(gene, mutatedChromosomeIndex);
 				}
 			}
+
+			//Find the best gene
+			for(GeneFitnessPair<T> pair: fitnessResults) {
+				float score = pair.getFitness();
+				if(score > maxScore) {
+					maxScore = score;
+					bestGene = pair;
+				}
+			}
 		} while(!problemDomain.canTerminate(fitnessResults));
 
-		TreeSet<GeneFitnessPair<T>> returnValue = new TreeSet<GeneFitnessPair<T>>(FITNESS_COMPARATOR);
-		returnValue.addAll(fitnessResults);
-		return returnValue;
+		return bestGene;
 	}
 
 	private static <T extends Gene> T pickRandom(
@@ -85,13 +91,6 @@ public class GeneticAlgorithm {
 
 		return fitnessResults.get(0).getGene();
 	}
-
-	private static final Comparator<GeneFitnessPair<?>> FITNESS_COMPARATOR = new Comparator<GeneFitnessPair<?>>() {
-		@Override
-		public int compare(GeneFitnessPair<?> lhs, GeneFitnessPair<?> rhs) {
-			return Float.compare(lhs.getFitness(), rhs.getFitness());
-		}
-	};
 
 	private static class FitnessFunction<T extends Gene> implements PlayerSkeleton.MapFunc<T, GeneFitnessPair<T>> {
 		public FitnessFunction(ProblemDomain<T> problemDomain) {
