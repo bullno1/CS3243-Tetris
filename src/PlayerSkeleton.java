@@ -18,7 +18,7 @@ public class PlayerSkeleton {
 				s.draw();
 				s.drawNext(0,0);
 				try {
-					Thread.sleep(300);
+					Thread.sleep(50);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -43,7 +43,15 @@ public class PlayerSkeleton {
 			evaluators.add(new ColumnHeight(columnIndex));
 		}
 
+		//Column height differences
+		/*for(int columnIndex = 0; columnIndex < State.COLS - 1; ++columnIndex) {
+			evaluators.add(new ColumnDiff(columnIndex, columnIndex + 1));
+			evaluators.add(new ColumnDiff(columnIndex + 1, columnIndex));
+		}*/
+
 		evaluators.add(new MaxColumnHeight());
+		evaluators.add(new NumRowsCleared());
+		evaluators.add(new HasLost());
 
 		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
@@ -51,7 +59,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 33.519493f, 26.983864f, 27.579832f, 39.10369f, 37.06415f, 45.665203f, 40.899426f, 41.192616f, 92.94577f, 35.54414f, 67.767006f }
+		{ 58.002388f, 42.384964f, 49.85073f, 89.19649f, 94.773735f, 79.59739f, 47.67528f, 98.75501f, 84.796974f, 36.119675f, 92.384056f, 22.189575f, 35.478706f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -179,6 +187,36 @@ public class PlayerSkeleton {
 
 			return -(float)maxHeight;
 		}
+	}
+
+	public static class NumRowsCleared implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult moveResult) {
+			return (float)moveResult.getRowsCleared();
+		}
+	}
+
+	public static class HasLost implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			return result.hasLost() ? -10.0f : 10.0f;
+		}
+	}
+
+	public static class ColumnDiff implements MoveEvaluator {
+		public ColumnDiff(int columnA, int columnB) {
+			this.columnA = columnA;
+			this.columnB = columnB;
+		}
+
+		@Override
+		public Float map(MoveResult result) {
+			int[] top = result.getState().getTop();
+			return (float)(top[columnA] - top[columnB]);
+		}
+
+		private final int columnA;
+		private final int columnB;
 	}
 
 	/**
