@@ -76,7 +76,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 		final int NUM_GAMES = 20;
 		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
 		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(gene); }
-		return mapReduce.mapReduce(EVAL_FUNC, MIN_SCORE, inputs);
+		return mapReduce.mapReduce(EVAL_FUNC, AVG_SCORE, inputs);
 	}
 
 	@Override

@@ -59,7 +59,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 714.2443f, 682.6591f, 158.30809f, 798.1245f, 723.04803f, 903.5107f, 311.32187f, 909.9456f, 119.21692f, 873.7069f, 253.98344f, 418.36185f, 930.38226f, 214.38527f, 279.96838f, 735.7997f, 687.60077f, 439.1053f, 626.21014f, 654.2828f, 396.79337f, 456.8771f, 917.01514f }
+		{ 194.53693f, 782.5058f, 410.62753f, 306.27466f, 338.83862f, 405.93726f, 284.98566f, 630.72253f, 363.8405f, 264.5861f, 372.45123f, 154.23805f, 129.56035f, 226.83466f, 265.32156f, 519.8202f, 926.3962f, 234.5562f, 131.11812f, 264.6544f, 483.74164f, 916.111f, 748.8432f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
