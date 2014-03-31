@@ -19,6 +19,7 @@ public class Trainer {
 					GeneticAlgorithm.run(new TetrisProblem(forkJoinPool), config);
 			GeneFitnessPair<WeightSet> fittest = bestGenes.last();
 
+			System.out.println();
 			System.out.println("Best score: " + fittest.getFitness());
 			System.out.println("Weights:");
 			System.out.print("{ ");
