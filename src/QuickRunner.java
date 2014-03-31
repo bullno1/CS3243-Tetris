@@ -1,16 +1,11 @@
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ForkJoinPool;
 
 public class QuickRunner {
 	public static void main(String[] args) {
 		State s = new State();
 
-		int numProcessors = Runtime.getRuntime().availableProcessors();
-		LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-		ExecutorService executorService = new ThreadPoolExecutor(numProcessors, numProcessors, 0, TimeUnit.MILLISECONDS, queue);
-		PlayerSkeleton p = new PlayerSkeleton(executorService);
+		ForkJoinPool forkJoinPool = new ForkJoinPool();
+		PlayerSkeleton p = new PlayerSkeleton(forkJoinPool);
 
 		try {
 			while(!s.hasLost()) {
@@ -21,7 +16,7 @@ public class QuickRunner {
 			e.printStackTrace();
 		}
 		finally {
-			executorService.shutdown();
+			forkJoinPool.shutdown();
 		}
 
 		System.out.println("You have completed "+s.getRowsCleared()+" rows.");

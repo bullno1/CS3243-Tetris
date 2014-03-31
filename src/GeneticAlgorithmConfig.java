@@ -1,13 +1,13 @@
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 
 
 public class GeneticAlgorithmConfig {
-	public GeneticAlgorithmConfig(ExecutorService executorService) {
-		this.executorService = executorService;
+	public GeneticAlgorithmConfig(ForkJoinPool forkJoinPool) {
+		this.forkJoinPool = forkJoinPool;
 	}
 
-	public ExecutorService getExecutorService() {
-		return executorService;
+	public ForkJoinPool getForkJoinPool() {
+		return forkJoinPool;
 	}
 
 	public float getCrossoverRate() {
@@ -37,7 +37,7 @@ public class GeneticAlgorithmConfig {
 		return this;
 	}
 
-	private ExecutorService executorService;
+	private ForkJoinPool forkJoinPool;
 	private float crossoverRate = 0.6f;
 	private float mutationRate = 0.01f;
 	private int populationSize = 10;

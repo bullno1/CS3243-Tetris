@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
@@ -47,8 +48,8 @@ public class PlayerSkeleton {
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
-		float[] weights = new float[EVALUATORS.length];
-		Arrays.fill(weights, 1.0f);
+		float[] weights = new float[]
+		{ 0.66822934f, 1.2253766f, 0.7809124f, 1.0725532f, 1.1921268f, 3.9741669f, 2.598425f, 0.51265097f, 0.7852218f, 1.1533034f};
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
@@ -356,6 +357,10 @@ public class PlayerSkeleton {
 			this.forkJoinPool = forkJoinPool;
 		}
 
+		public <Src, Dst> void map(MapFunc<Src, Dst> mapFunc, Iterable<Src> inputs, Collection<Dst> outputs) {
+			forkJoinPool.invoke(new MapTask<Src, Dst>(mapFunc, inputs, outputs));
+		}
+
 		public <SrcT, IntT, DstT> DstT mapReduce(
 				MapFunc<SrcT, IntT> mapFunc, ReduceFunc<IntT, DstT> reduceFunc, Iterable<SrcT> inputs) {
 
@@ -373,6 +378,70 @@ public class PlayerSkeleton {
 		public DstT reduce(Iterable<SrcT> inputs);
 	}
 
+	public static class MapTask<SrcT, DstT> extends ForkJoinTask<Void> {
+		public MapTask(MapFunc<SrcT, DstT> mapFunc, Iterable<SrcT> inputs, Collection<DstT> outputs) {
+			this.mapFunc = mapFunc;
+			this.inputs = inputs;
+			this.outputs = outputs;
+		}
+
+		@Override
+		protected boolean exec() {
+			ArrayList<ForkJoinTask<DstT>> applyTasks = new ArrayList<ForkJoinTask<DstT>>();
+			for(SrcT input: inputs) {
+				applyTasks.add(new ApplyTask(input));
+			}
+			invokeAll(applyTasks);
+
+			for(ForkJoinTask<DstT> applyTask: applyTasks) {
+				outputs.add(applyTask.join());
+			}
+
+			return true;
+		}
+
+		@Override
+		public Void getRawResult() {
+			return null;
+		}
+
+		@Override
+		protected void setRawResult(Void value) {
+		}
+
+		private final MapFunc<SrcT, DstT> mapFunc;
+		private final Iterable<SrcT> inputs;
+		private final Collection<DstT> outputs;
+		private static final long serialVersionUID = 1L;
+
+		private class ApplyTask extends ForkJoinTask<DstT> {
+			public ApplyTask(SrcT input) {
+				this.input = input;
+			}
+
+			@Override
+			protected boolean exec() {
+				setRawResult(mapFunc.map(input));
+				return true;
+			}
+
+			@Override
+			public DstT getRawResult() {
+				return output;
+			}
+
+			@Override
+			protected void setRawResult(DstT value) {
+				output = value;
+			}
+
+			private final SrcT input;
+			private DstT output;
+
+			private static final long serialVersionUID = 1L;
+		}
+	}
+
 	public static class MapReduceTask<SrcT, IntT, DstT> extends ForkJoinTask<DstT> {
 		public MapReduceTask(
 				MapFunc<SrcT, IntT> mapFunc, ReduceFunc<IntT, DstT> reduceFunc, Iterable<SrcT> inputs) {
@@ -384,17 +453,9 @@ public class PlayerSkeleton {
 		@Override
 		protected boolean exec() {
 			//Map
-			ArrayList<ForkJoinTask<IntT>> mapTasks = new ArrayList<ForkJoinTask<IntT>>();
-			for(SrcT input: inputs) {
-				mapTasks.add(new MapTask(input));
-			}
-			invokeAll(mapTasks);
-
 			ArrayList<IntT> mapResults = new ArrayList<IntT>();
-			for(ForkJoinTask<IntT> task: mapTasks) {
-				mapResults.add(task.join());
-			}
-
+			MapTask<SrcT, IntT> mapTask = new MapTask<SrcT, IntT>(mapFunc, inputs, mapResults);
+			mapTask.invoke();
 			//Reduce
 			setRawResult(reduceFunc.reduce(mapResults));
 
@@ -416,33 +477,6 @@ public class PlayerSkeleton {
 		private MapFunc<SrcT, IntT> mapFunc;
 		private ReduceFunc<IntT, DstT> reduceFunc;
 		private static final long serialVersionUID = 1L;
-
-		private class MapTask extends ForkJoinTask<IntT> {
-			public MapTask(SrcT input) {
-				this.input = input;
-			}
-
-			@Override
-			protected boolean exec() {
-				setRawResult(mapFunc.map(input));
-				return true;
-			}
-
-			@Override
-			public IntT getRawResult() {
-				return output;
-			}
-
-			@Override
-			protected void setRawResult(IntT value) {
-				output = value;
-			}
-
-			private IntT output = null;
-			private final SrcT input;
-
-			private static final long serialVersionUID = 1L;
-		}
 	}
 
 	/**
