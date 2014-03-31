@@ -18,7 +18,7 @@ public class PlayerSkeleton {
 				s.draw();
 				s.drawNext(0,0);
 				try {
-					Thread.sleep(50);
+					Thread.sleep(1);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -59,7 +59,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 194.53693f, 782.5058f, 410.62753f, 306.27466f, 338.83862f, 405.93726f, 284.98566f, 630.72253f, 363.8405f, 264.5861f, 372.45123f, 154.23805f, 129.56035f, 226.83466f, 265.32156f, 519.8202f, 926.3962f, 234.5562f, 131.11812f, 264.6544f, 483.74164f, 916.111f, 748.8432f }
+		{ 218.56714f, 725.98706f, 900.6476f, 116.13441f, 810.33826f, 832.9624f, 716.9496f, 531.20996f, 569.46796f, 645.2192f, 501.11847f, 898.78937f, 856.9242f, 790.98956f, 832.2103f, 763.6495f, 226.48352f, 487.93118f, 833.4545f, 370.78738f, 873.14264f, 808.7043f, 945.0662f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -217,7 +217,7 @@ public class PlayerSkeleton {
 				}
 			}
 
-			return -(float)numFaults;
+			return -(float)numFaults * 5;
 		}
 	}
 
