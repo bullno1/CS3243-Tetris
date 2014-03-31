@@ -22,11 +22,18 @@ public class Trainer {
 			System.out.println("Best score: " + fittest.getFitness());
 			System.out.println("Weights:");
 			System.out.print("{ ");
+			boolean first = true;
 			for(float weight: fittest.getGene().getWeights()) {
+				if(first) {
+					first = false;
+				}
+				else {
+					System.out.print("f, ");
+				}
+
 				System.out.print(weight);
-				System.out.print("f, ");
 			}
-			System.out.println(" }");
+			System.out.println("f }");
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
