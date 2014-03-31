@@ -3,6 +3,31 @@ import java.util.Random;
 import java.util.concurrent.ForkJoinPool;
 
 class TetrisProblem implements ProblemDomain<WeightSet> {
+	public static void main(String[] args) {
+		System.out.println("Number of features: " + PlayerSkeleton.EVALUATORS.length);
+
+		ForkJoinPool forkJoinPool = new ForkJoinPool();
+
+		GeneticAlgorithmConfig config =
+			new GeneticAlgorithmConfig(forkJoinPool)
+			    .setCrossoverRate(0.7f)
+			    .setMutationRate(0.01f)
+			    .setPopulationSize(100);
+		try {
+			GeneFitnessPair<WeightSet> fittest =
+					GeneticAlgorithm.run(new TetrisProblem(forkJoinPool), config);
+
+			System.out.println();
+			System.out.println("Best score: " + fittest.getFitness());
+			System.out.println("Weights:");
+			printGene(fittest);
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			forkJoinPool.shutdown();
+		}
+	}
+
 	public TetrisProblem(ForkJoinPool forkJoinPool) {
 		this.forkJoinPool = forkJoinPool;
 		this.mapReduce = new PlayerSkeleton.MapReduce(forkJoinPool);
@@ -22,10 +47,12 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	@Override
 	public boolean canTerminate(Iterable<GeneFitnessPair<WeightSet>> population) {
 		float maxScore = -Float.MAX_VALUE;
+		GeneFitnessPair<WeightSet> bestGene = null;
 		for(GeneFitnessPair<WeightSet> pair: population) {
 			float score = pair.getFitness();
 			if(score > maxScore) {
 				maxScore = score;
+				bestGene = pair;
 			}
 		}
 
@@ -34,6 +61,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			numLostGenerations = 0;
 			System.out.println();
 			System.out.println("Score: " + bestScore);
+			printGene(bestGene);
 			return false;
 		}
 		else {
@@ -78,13 +106,30 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	}
 
 	private float randomChromosome() {
-		return random.nextFloat() * 100.0f;
+		return random.nextFloat() * 1000.0f;
 	}
 
 	private static WeightSet newGene() {
 		float[] weights = new float[PlayerSkeleton.EVALUATORS.length];
 		return new WeightSet(weights);
 	}
+
+	private static void printGene(GeneFitnessPair<WeightSet> fittest) {
+		System.out.print("{ ");
+		boolean first = true;
+		for(float weight: fittest.getGene().getWeights()) {
+			if(first) {
+				first = false;
+			}
+			else {
+				System.out.print("f, ");
+			}
+
+			System.out.print(weight);
+		}
+		System.out.println("f }");
+	}
+
 
 	private ForkJoinPool forkJoinPool;
 	private PlayerSkeleton.MapReduce mapReduce;

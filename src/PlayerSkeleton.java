@@ -52,6 +52,7 @@ public class PlayerSkeleton {
 		evaluators.add(new MaxColumnHeight());
 		evaluators.add(new NumRowsCleared());
 		evaluators.add(new HasLost());
+		evaluators.add(new NumFaults());
 
 		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
@@ -59,7 +60,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 58.002388f, 42.384964f, 49.85073f, 89.19649f, 94.773735f, 79.59739f, 47.67528f, 98.75501f, 84.796974f, 36.119675f, 92.384056f, 22.189575f, 35.478706f }
+		{ 141.15918f, 304.24768f, 201.45792f, 138.59904f, 960.8583f, 535.3489f, 276.74084f, 333.11343f, 298.93433f, 57.652115f, 988.6826f, 910.4831f, 378.3983f, 624.7744f }
 		;
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -200,6 +201,24 @@ public class PlayerSkeleton {
 		@Override
 		public Float map(MoveResult result) {
 			return result.hasLost() ? -10.0f : 10.0f;
+		}
+	}
+
+	public static class NumFaults implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			int[][] field = result.getState().getField();
+			int numFaults = 0;
+
+			for(int y = State.ROWS - 2; y >= 0; --y) {
+				for(int x = 0; x < State.COLS; ++x) {
+					if(field[y][x] == 0 && field[y + 1][x] !=0) {
+						++numFaults;
+					}
+				}
+			}
+
+			return -(float)numFaults;
 		}
 	}
 

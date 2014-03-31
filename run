@@ -1,2 +1,2 @@
 #!/bin/sh
-make && java -cp bin PlayerSkeleton
+java -cp bin QuickRunner
