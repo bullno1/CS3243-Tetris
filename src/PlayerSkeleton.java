@@ -54,7 +54,7 @@ public class PlayerSkeleton {
 		evaluators.add(new NumRowsCleared());
 		evaluators.add(new HasLost());
 		evaluators.add(new NumFaults());
-		evaluators.add(new MeanHeight());
+		// evaluators.add(new MeanHeight());
 		// evaluators.add(new NumWells());
 
 		evaluators.add(new PitDepths());
@@ -64,9 +64,8 @@ public class PlayerSkeleton {
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
-		float[] weights = new float[] { 965.6705f, 268.07947f, 462.09515f,
-				895.38696f, 616.96906f, 339.4527f, 856.94403f };
-		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
+		float[] weights = new float[] { 587.5112f, 438.03345f, 474.9645f,
+				939.3418f, 408.60773f, 815.7669f };		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool, float[] weights) {
@@ -266,23 +265,20 @@ public class PlayerSkeleton {
 		@Override
 		public Float map(MoveResult result) {
 			int[][] field = result.getState().getField();
+			int[] top = result.getState().getTop();
 			int numFaults = 0;
 
 			for (int x = 0; x < State.COLS; ++x) {
-				for (int y = State.ROWS - 2; y >= 0; --y) {
-					for (int y2 = y + 1; y2 < State.ROWS - 2; y2++) {
-						if (field[y][x] == 0 && field[y2][x] != 0) {
-							++numFaults;
-							break;
-						}
+				for (int y = top[x] - 1; y >= 0; --y) {
+					if (field[y][x] == 0) {
+						++numFaults;
 					}
 				}
 			}
 
-			return -(float) numFaults * 10;
+			return -(float) 10.0 * numFaults;
 		}
 	}
-
 	public static class PitDepths implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
