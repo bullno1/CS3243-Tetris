@@ -18,6 +18,7 @@ public class ImmutableStateTest {
 	@Test
 	public void creationTest() {
 		assertStateEquals(mutableState, immutableState);
+		assertStateEquals(mutableState, new PlayerSkeleton.ImmutableState());
 	}
 
 	@Test
@@ -31,7 +32,7 @@ public class ImmutableStateTest {
 	@Test
 	public void consistencyTest() {
 		Random random = new Random();
-		for(int i = 0; i < 1000; ++i) {//Play 10000 games
+		for(int i = 0; i < 10000; ++i) {//Play 10000 games
 			PlayerSkeleton.MoveResult lastResult = null;
 			int lastScore = 0;
 			while(!mutableState.hasLost()) {

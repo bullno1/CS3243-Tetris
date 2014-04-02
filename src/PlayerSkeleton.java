@@ -380,6 +380,15 @@ public class PlayerSkeleton {
 			this.turn = turn;
 		}
 
+		/**
+		 * Construct an empty state
+		 */
+		public ImmutableState() {
+			field = new int[State.ROWS][State.COLS];
+			top = new int[State.COLS];
+			turn = 0;
+		}
+
 		public int[][] getField() {
 			return field;
 		}
