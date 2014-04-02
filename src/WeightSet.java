@@ -1,11 +1,11 @@
 
-public class WeightSet implements Gene {
+public class WeightSet implements Chromosome {
 	public WeightSet(float[] weights) {
 		this.weights = weights;
 	}
 
 	@Override
-	public int getNumChromosomes() {
+	public int getNumGenes() {
 		return weights.length;
 	}
 

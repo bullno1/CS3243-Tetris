@@ -14,13 +14,13 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			    .setMutationRate(0.01f)
 			    .setPopulationSize(100);
 		try {
-			GeneFitnessPair<WeightSet> fittest =
+			ChromosomeFitnessPair<WeightSet> fittest =
 					GeneticAlgorithm.run(new TetrisProblem(forkJoinPool), config);
 
 			System.out.println();
 			System.out.println("Best score: " + fittest.getFitness());
 			System.out.println("Weights:");
-			printGene(fittest);
+			printChromosome(fittest);
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -34,25 +34,25 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	}
 
 	@Override
-	public WeightSet newRandomGene() {
-		WeightSet gene = newGene();
-		float[] weights = gene.getWeights();
+	public WeightSet newRandomChromosome() {
+		WeightSet chromosome = newChromosome();
+		float[] weights = chromosome.getWeights();
 		for(int weightIndex = 0; weightIndex < weights.length; ++weightIndex) {
-			weights[weightIndex] = randomChromosome();
+			weights[weightIndex] = randomGene();
 		}
 
 		return new WeightSet(weights);
 	}
 
 	@Override
-	public boolean canTerminate(Iterable<GeneFitnessPair<WeightSet>> population) {
+	public boolean canTerminate(Iterable<ChromosomeFitnessPair<WeightSet>> population) {
 		float maxScore = -Float.MAX_VALUE;
-		GeneFitnessPair<WeightSet> bestGene = null;
-		for(GeneFitnessPair<WeightSet> pair: population) {
+		ChromosomeFitnessPair<WeightSet> bestChromosome = null;
+		for(ChromosomeFitnessPair<WeightSet> pair: population) {
 			float score = pair.getFitness();
 			if(score > maxScore) {
 				maxScore = score;
-				bestGene = pair;
+				bestChromosome = pair;
 			}
 		}
 
@@ -61,7 +61,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			numLostGenerations = 0;
 			System.out.println();
 			System.out.println("Score: " + bestScore);
-			printGene(bestGene);
+			printChromosome(bestChromosome);
 			return false;
 		}
 		else {
@@ -72,52 +72,52 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	}
 
 	@Override
-	public float evaluateFitness(WeightSet gene) {
+	public float evaluateFitness(WeightSet chromosome) {
 		final int NUM_GAMES = 50;
 		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
-		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(gene); }
+		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(chromosome); }
 		return mapReduce.mapReduce(EVAL_FUNC, AVG_SCORE, inputs);
 	}
 
 	@Override
-	public void mutate(WeightSet gene, int mutatedChromosomeIndex) {
-		gene.getWeights()[mutatedChromosomeIndex] = randomChromosome();
+	public void mutate(WeightSet chromosome, int mutatedChromosomeIndex) {
+		chromosome.getWeights()[mutatedChromosomeIndex] = randomGene();
 	}
 
 	@Override
 	public WeightSet[] crossover(WeightSet parent1, WeightSet parent2,
-			int crossOverPoint) {
+			int crossoverPoint) {
 
 		float[] parent1Weights = parent1.getWeights();
 		float[] parent2Weights = parent2.getWeights();
 		int numChromosomes = parent1Weights.length;
 
-		WeightSet children1 = newGene();
-		WeightSet children2 = newGene();
+		WeightSet children1 = newChromosome();
+		WeightSet children2 = newChromosome();
 		float[] weights1 = children1.getWeights();
 		float[] weights2 = children2.getWeights();
 
-		System.arraycopy(parent1Weights, 0, weights1, 0, crossOverPoint);
-		System.arraycopy(parent2Weights, 0, weights2, 0, crossOverPoint);
-		System.arraycopy(parent1Weights, crossOverPoint, weights2, crossOverPoint, numChromosomes - crossOverPoint);
-		System.arraycopy(parent2Weights, crossOverPoint, weights1, crossOverPoint, numChromosomes - crossOverPoint);
+		System.arraycopy(parent1Weights, 0, weights1, 0, crossoverPoint);
+		System.arraycopy(parent2Weights, 0, weights2, 0, crossoverPoint);
+		System.arraycopy(parent1Weights, crossoverPoint, weights2, crossoverPoint, numChromosomes - crossoverPoint);
+		System.arraycopy(parent2Weights, crossoverPoint, weights1, crossoverPoint, numChromosomes - crossoverPoint);
 
 		return new WeightSet[] { children1, children2 };
 	}
 
-	private float randomChromosome() {
+	private float randomGene() {
 		return random.nextFloat() * 1000.0f;
 	}
 
-	private static WeightSet newGene() {
+	private static WeightSet newChromosome() {
 		float[] weights = new float[PlayerSkeleton.EVALUATORS.length];
 		return new WeightSet(weights);
 	}
 
-	private static void printGene(GeneFitnessPair<WeightSet> fittest) {
+	private static void printChromosome(ChromosomeFitnessPair<WeightSet> fittest) {
 		System.out.print("{ ");
 		boolean first = true;
-		for(float weight: fittest.getGene().getWeights()) {
+		for(float weight: fittest.getChromosome().getWeights()) {
 			if(first) {
 				first = false;
 			}
@@ -139,9 +139,9 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 	private final PlayerSkeleton.MapFunc<WeightSet, Float> EVAL_FUNC = new PlayerSkeleton.MapFunc<WeightSet, Float>() {
 		@Override
-		public Float map(WeightSet gene) {
+		public Float map(WeightSet chromosome) {
 			State state = new State();
-			PlayerSkeleton player = new PlayerSkeleton(forkJoinPool, gene.getWeights());
+			PlayerSkeleton player = new PlayerSkeleton(forkJoinPool, chromosome.getWeights());
 			while(!state.hasLost()) {
 				state.makeMove(player.pickMove(state, state.legalMoves()));
 			}

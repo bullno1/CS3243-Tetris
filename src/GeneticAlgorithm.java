@@ -5,24 +5,24 @@ import java.util.Random;
  * Trains and optimizes weights for features
  */
 public class GeneticAlgorithm {
-	public static <T extends Gene> GeneFitnessPair<T> run(
+	public static <T extends Chromosome> ChromosomeFitnessPair<T> run(
 			ProblemDomain<T> problemDomain, GeneticAlgorithmConfig config) {
 
 		//Initialize
 		Random random = new Random();
-		ArrayList<GeneFitnessPair<T>> fitnessResults = new ArrayList<GeneFitnessPair<T>>();
+		ArrayList<ChromosomeFitnessPair<T>> fitnessResults = new ArrayList<ChromosomeFitnessPair<T>>();
 		int populationSize = config.getPopulationSize();
 		float crossoverRate = config.getCrossoverRate();
 		float mutationRate = config.getMutationRate();
 		PlayerSkeleton.MapReduce mapReduce = new PlayerSkeleton.MapReduce(config.getForkJoinPool());
-		PlayerSkeleton.MapFunc<T, GeneFitnessPair<T>> fitnessFunction = new FitnessFunction<T>(problemDomain);
-		GeneFitnessPair<T> bestGene = null;
+		PlayerSkeleton.MapFunc<T, ChromosomeFitnessPair<T>> fitnessFunction = new FitnessFunction<T>(problemDomain);
+		ChromosomeFitnessPair<T> bestChromosome = null;
 		float maxScore = -Float.MAX_VALUE;
 
 		//Create a population
 		ArrayList<T> population = new ArrayList<T>();
 		for(int i = 0; i < populationSize; ++i) {
-			population.add(problemDomain.newRandomGene());
+			population.add(problemDomain.newRandomChromosome());
 		}
 
 		do {
@@ -33,7 +33,7 @@ public class GeneticAlgorithm {
 			ArrayList<T> nextGeneration = new ArrayList<T>();
 			//Calculate sum of fitness for roulette-based selection
 			float totalFitness = 0.0f;
-			for(GeneFitnessPair<T> result: fitnessResults) {
+			for(ChromosomeFitnessPair<T> result: fitnessResults) {
 				totalFitness += result.getFitness();
 			}
 			//Keep creating offspring until we have a full new population
@@ -42,8 +42,8 @@ public class GeneticAlgorithm {
 				T parent2 = pickRandom(random, totalFitness, fitnessResults);
 
 				if(random.nextFloat() < crossoverRate) {//cross over happens
-					int crossOverPoint = random.nextInt(parent1.getNumChromosomes());
-					T[] children = problemDomain.crossover(parent1, parent2, crossOverPoint);
+					int crossoverPoint = random.nextInt(parent1.getNumGenes());
+					T[] children = problemDomain.crossover(parent1, parent2, crossoverPoint);
 					for(T child: children) {
 						nextGeneration.add(child);
 					}
@@ -55,51 +55,51 @@ public class GeneticAlgorithm {
 			}
 
 			//Mutation
-			for(T gene: nextGeneration) {
+			for(T chromosome: nextGeneration) {
 				if(random.nextFloat() < mutationRate) {//mutation happens
-					int mutatedChromosomeIndex = random.nextInt(gene.getNumChromosomes());
-					problemDomain.mutate(gene, mutatedChromosomeIndex);
+					int mutatedGeneIndex = random.nextInt(chromosome.getNumGenes());
+					problemDomain.mutate(chromosome, mutatedGeneIndex);
 				}
 			}
 
-			//Find the best gene
-			for(GeneFitnessPair<T> pair: fitnessResults) {
+			//Find the best chromosome
+			for(ChromosomeFitnessPair<T> pair: fitnessResults) {
 				float score = pair.getFitness();
 				if(score > maxScore) {
 					maxScore = score;
-					bestGene = pair;
+					bestChromosome = pair;
 				}
 			}
 		} while(!problemDomain.canTerminate(fitnessResults));
 
-		return bestGene;
+		return bestChromosome;
 	}
 
-	private static <T extends Gene> T pickRandom(
-			Random random, float totalFitness, ArrayList<GeneFitnessPair<T>> fitnessResults) {
+	private static <T extends Chromosome> T pickRandom(
+			Random random, float totalFitness, ArrayList<ChromosomeFitnessPair<T>> fitnessResults) {
 		float decision = random.nextFloat() * totalFitness;
-		for(GeneFitnessPair<T> result: fitnessResults) {
+		for(ChromosomeFitnessPair<T> result: fitnessResults) {
 			float fitness = result.getFitness();
 
 			if(decision < fitness) {
-				return result.getGene();
+				return result.getChromosome();
 			}
 			else {
 				decision -= fitness;
 			}
 		}
 
-		return fitnessResults.get(0).getGene();
+		return fitnessResults.get(0).getChromosome();
 	}
 
-	private static class FitnessFunction<T extends Gene> implements PlayerSkeleton.MapFunc<T, GeneFitnessPair<T>> {
+	private static class FitnessFunction<T extends Chromosome> implements PlayerSkeleton.MapFunc<T, ChromosomeFitnessPair<T>> {
 		public FitnessFunction(ProblemDomain<T> problemDomain) {
 			this.problemDomain = problemDomain;
 		}
 
 		@Override
-		public GeneFitnessPair<T> map(T gene) {
-			return new GeneFitnessPair<T>(gene, problemDomain.evaluateFitness(gene));
+		public ChromosomeFitnessPair<T> map(T chromosome) {
+			return new ChromosomeFitnessPair<T>(chromosome, problemDomain.evaluateFitness(chromosome));
 		}
 
 		private ProblemDomain<T> problemDomain;
