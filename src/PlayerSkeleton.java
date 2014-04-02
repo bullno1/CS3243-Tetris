@@ -5,6 +5,14 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
 public class PlayerSkeleton {
+	private static final float roughnessWeight = 0.9f;
+	private static final float maxColumnHeightWeight = 0.8f;
+	private static final float numRowsClearedWeight = 0.8f;
+	private static final float hasLostWeight = 1;
+	private static final float numFaultsWeight = 6.0f;
+	private static final float pitDepthsWeight = 1.2f;
+	private static final float meanHeightDifferenceWeight = 0.85f;
+	
 	public static void main(String[] args) {
 		State s = new State();
 
@@ -55,8 +63,8 @@ public class PlayerSkeleton {
 		evaluators.add(new NumFaults());
 		// evaluators.add(new MeanHeight());
 		// evaluators.add(new NumWells());
-
 		evaluators.add(new PitDepths());
+		evaluators.add(new MeanHeightDifference());
 
 		EVALUATORS = evaluators.toArray(new MoveEvaluator[evaluators.size()]);
 	}
@@ -64,8 +72,7 @@ public class PlayerSkeleton {
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
 		float[] weights = new float[]
-		{ 446.273040771484375f, 129.36907958984375f, 274.052093505859375f, 583.1173095703125f, 271.36175537109375f, 590.993896484375f }
-		;
+				{ 363.5092f, 194.57817f, 188.69507f, 943.2513f, 396.27356f, 512.3429f, 604.4724f };
 		//{ 587.5112f, 438.03345f, 474.9645f,	939.3418f, 408.60773f, 815.7669f };
 		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
@@ -235,6 +242,28 @@ public class PlayerSkeleton {
 			return -(float) sum / (float) top.length;
 		}
 	}
+	
+	public static class MeanHeightDifference implements MoveEvaluator {
+		@Override
+		public Float map(MoveResult result) {
+			int[] top = result.getState().getTop();
+
+			int sum = 0;
+			for (int height : top) {
+				sum += height;
+			}
+
+			float meanHeight = (float) sum / top.length;
+
+			float avgDiff = 0;
+			for (int height : top) {
+				avgDiff += Math.abs(meanHeight - height);
+			}
+
+			return -(avgDiff / (float) top.length) * meanHeightDifferenceWeight;
+		}
+	}
+
 
 	public static class MaxColumnHeight implements MoveEvaluator {
 		@Override
@@ -249,14 +278,14 @@ public class PlayerSkeleton {
 				}
 			}
 
-			return -(float) maxHeight;
+			return -(float) maxHeight * maxColumnHeightWeight;
 		}
 	}
 
 	public static class NumRowsCleared implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult moveResult) {
-			return (float) moveResult.getRowsCleared();
+			return (float) moveResult.getRowsCleared() * numRowsClearedWeight;
 		}
 	}
 
@@ -282,7 +311,7 @@ public class PlayerSkeleton {
 				}
 			}
 
-			return -(float) 10.0 * numFaults;
+			return -(float) numFaults * numFaultsWeight;
 		}
 	}
 	public static class PitDepths implements MoveEvaluator {
@@ -325,7 +354,7 @@ public class PlayerSkeleton {
 				sumOfPitDepths += diff;
 			}
 
-			return -(float) sumOfPitDepths;
+			return -(float) sumOfPitDepths * pitDepthsWeight;
 
 		}
 	}
@@ -338,7 +367,7 @@ public class PlayerSkeleton {
 			for (int i = 0; i < top.length - 1; ++i) {
 				roughness += Math.abs(top[i] - top[i + 1]);
 			}
-			return -(float) roughness;
+			return -(float) roughness * roughnessWeight;
 		}
 	}
 
