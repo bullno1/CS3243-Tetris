@@ -1,8 +1,16 @@
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.ForkJoinPool;
 
 class TetrisProblem implements ProblemDomain<WeightSet> {
+	public static final int SEQUENCE_LENGTH = 10000000;
+	public static final int NUM_SEQUENCES = 5;
+	public static final int MAX_LOST_GENERATIONS = 20;
+	public static final float CROSSOVER_RATE = 0.6f;
+	public static final float MUTATION_RATE = 0.01f;
+	public static final int POPULATION_SIZE = 100;
+
 	public static void main(String[] args) {
 		System.out.println("Number of features: " + PlayerSkeleton.EVALUATORS.length);
 
@@ -10,9 +18,9 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 		GeneticAlgorithmConfig config =
 			new GeneticAlgorithmConfig(forkJoinPool)
-			    .setCrossoverRate(0.7f)
-			    .setMutationRate(0.01f)
-			    .setPopulationSize(100);
+			    .setCrossoverRate(CROSSOVER_RATE)
+			    .setMutationRate(MUTATION_RATE)
+			    .setPopulationSize(POPULATION_SIZE);
 		try {
 			ChromosomeFitnessPair<WeightSet> fittest =
 					GeneticAlgorithm.run(new TetrisProblem(forkJoinPool), config);
@@ -46,6 +54,12 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 
 	@Override
 	public void beginGeneration() {
+		//Create new sequences to use for this generation's evaluation
+		for(int seqIndex = 0; seqIndex < NUM_SEQUENCES; ++seqIndex) {
+			for(int pieceIndex = 0; pieceIndex < SEQUENCE_LENGTH; ++pieceIndex) {
+				sequences[seqIndex][pieceIndex] = random.nextInt(State.N_PIECES);
+			}
+		}
 	}
 
 	@Override
@@ -60,27 +74,36 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			}
 		}
 
+		System.out.println("Score: " + maxScore);
+		printChromosome(bestChromosome);
+
 		if(maxScore > bestScore) {
 			bestScore = maxScore;
 			numLostGenerations = 0;
+			for(int i = 0; i < MAX_LOST_GENERATIONS; ++i) {
+				System.out.print("+");
+			}
 			System.out.println();
-			System.out.println("Score: " + bestScore);
-			printChromosome(bestChromosome);
 			return true;
 		}
 		else {
 			++numLostGenerations;
-			System.out.print(".");
-			return numLostGenerations < 20;
+			for(int i = 0; i < MAX_LOST_GENERATIONS - numLostGenerations; ++i) {
+				System.out.print("-");
+			}
+			System.out.println();
+			return numLostGenerations < MAX_LOST_GENERATIONS;
 		}
 	}
 
 	@Override
 	public float evaluateFitness(WeightSet chromosome) {
-		final int NUM_GAMES = 50;
-		ArrayList<WeightSet> inputs = new ArrayList<WeightSet>(NUM_GAMES);
-		for(int i = 0; i < NUM_GAMES; ++i) { inputs.add(chromosome); }
-		return mapReduce.mapReduce(EVAL_FUNC, AVG_SCORE, inputs);
+		ArrayList<TestConfig> testConfigs = new ArrayList<TestConfig>(NUM_SEQUENCES);
+		for(int i = 0; i < NUM_SEQUENCES; ++i) {
+			testConfigs.add(new TestConfig(chromosome.getWeights(), sequences[i], forkJoinPool));
+		}
+
+		return mapReduce.mapReduce(FITNESS_FUNC, AVG_SCORE, testConfigs);
 	}
 
 	@Override
@@ -129,72 +152,83 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 				System.out.print("f, ");
 			}
 
-			System.out.print(weight);
+			System.out.print(new BigDecimal(weight));
 		}
 		System.out.println("f }");
 	}
 
-
 	private ForkJoinPool forkJoinPool;
-	private PlayerSkeleton.MapReduce mapReduce;
 	private Random random = new Random();
 	private float bestScore = -Float.MAX_VALUE;
 	private int numLostGenerations = 0;
+	private PlayerSkeleton.MapReduce mapReduce;
+	private int[][] sequences = new int[NUM_SEQUENCES][SEQUENCE_LENGTH];
 
-	private final PlayerSkeleton.MapFunc<WeightSet, Float> EVAL_FUNC = new PlayerSkeleton.MapFunc<WeightSet, Float>() {
+	private static final PlayerSkeleton.MapFunc<TestConfig, Float> FITNESS_FUNC =
+	new PlayerSkeleton.MapFunc<TestConfig, Float>() {
 		@Override
-		public Float map(WeightSet chromosome) {
-			State state = new State();
-			PlayerSkeleton player = new PlayerSkeleton(forkJoinPool, chromosome.getWeights());
-			while(!state.hasLost()) {
-				state.makeMove(player.pickMove(state, state.legalMoves()));
+		public Float map(TestConfig config) {
+
+			PlayerSkeleton.ImmutableState state = new PlayerSkeleton.ImmutableState();
+			PlayerSkeleton player = new PlayerSkeleton(config.getForkJoinPool(), config.getWeights());
+
+			int turn = 0;
+			boolean hasLost = false;
+			int rowsCleared = 0;
+			int[] sequence = config.getSequence();
+
+			while(!hasLost) {
+				int piece = sequence[turn];
+				int[][] legalMoves = State.legalMoves[piece];
+				int move = player.pickMove(state, piece, State.legalMoves[piece]);
+				PlayerSkeleton.MoveResult result = state.move(piece, legalMoves[move][0], legalMoves[move][1]);
+				state = result.getState();
+				hasLost = result.hasLost();
+				rowsCleared += result.getRowsCleared();
+
+				++turn;
 			}
-			return (float)state.getRowsCleared();
+			return (float)rowsCleared;
 		}
 	};
 
-	private final PlayerSkeleton.ReduceFunc<Float, Float> PERCENTILE_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
+	private static final PlayerSkeleton.ReduceFunc<Float, Float> AVG_SCORE =
+	new PlayerSkeleton.ReduceFunc<Float, Float>() {
 		@Override
 		public Float reduce(Iterable<Float> inputs) {
-			ArrayList<Float> scores = new ArrayList<Float>();
-			for(Float score: inputs) {
-				scores.add(score);
-			}
-
-			float PERCENTILE = 0.5f;
-			int index = Math.round(scores.size() * PERCENTILE) - 1;
-
-			return scores.get(index);
-		}
-	};
-
-	private final PlayerSkeleton.ReduceFunc<Float, Float> AVG_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
-		@Override
-		public Float reduce(Iterable<Float> inputs) {
-			int numGames = 0;
+			int count = 0;
 			float sum = 0.0f;
 
-			for(Float score: inputs) {
-				sum += score;
-				++numGames;
+			for(float num: inputs) {
+				sum += num;
+				++count;
 			}
 
-			return sum / numGames;
+			return sum / (float)count;
 		}
 	};
 
-	private final PlayerSkeleton.ReduceFunc<Float, Float> MIN_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
-		@Override
-		public Float reduce(Iterable<Float> inputs) {
-			Float minScore = Float.MAX_VALUE;
-
-			for(Float score: inputs) {
-				if(score < minScore) {
-					minScore = score;
-				}
-			}
-
-			return minScore;
+	private static class TestConfig {
+		public TestConfig(float[] weights, int[] sequence, ForkJoinPool forkJoinPool) {
+			this.weights = weights;
+			this.sequence = sequence;
+			this.forkJoinPool = forkJoinPool;
 		}
-	};
+
+		public float[] getWeights() {
+			return weights;
+		}
+
+		public int[] getSequence() {
+			return sequence;
+		}
+
+		public ForkJoinPool getForkJoinPool() {
+			return forkJoinPool;
+		}
+
+		private final ForkJoinPool forkJoinPool;
+		private final float[] weights;
+		private final int[] sequence;
+	}
 }

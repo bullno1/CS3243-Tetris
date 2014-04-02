@@ -16,8 +16,6 @@ public class GeneticAlgorithm {
 		float mutationRate = config.getMutationRate();
 		PlayerSkeleton.MapReduce mapReduce = new PlayerSkeleton.MapReduce(config.getForkJoinPool());
 		PlayerSkeleton.MapFunc<T, ChromosomeFitnessPair<T>> fitnessFunction = new FitnessFunction<T>(problemDomain);
-		ChromosomeFitnessPair<T> bestChromosome = null;
-		float maxScore = -Float.MAX_VALUE;
 
 		//Create a population
 		ArrayList<T> population = new ArrayList<T>();
@@ -37,6 +35,7 @@ public class GeneticAlgorithm {
 			for(ChromosomeFitnessPair<T> result: fitnessResults) {
 				totalFitness += result.getFitness();
 			}
+
 			//Keep creating offspring until we have a full new population
 			while(nextGeneration.size() < populationSize) {
 				T parent1 = pickRandom(random, totalFitness, fitnessResults);
@@ -57,22 +56,24 @@ public class GeneticAlgorithm {
 
 			//Mutation
 			for(T chromosome: nextGeneration) {
-				if(random.nextFloat() < mutationRate) {//mutation happens
-					int mutatedGeneIndex = random.nextInt(chromosome.getNumGenes());
-					problemDomain.mutate(chromosome, mutatedGeneIndex);
-				}
-			}
-
-			//Find the best chromosome
-			for(ChromosomeFitnessPair<T> pair: fitnessResults) {
-				float score = pair.getFitness();
-				if(score > maxScore) {
-					maxScore = score;
-					bestChromosome = pair;
+				for(int geneIndex = 0; geneIndex < chromosome.getNumGenes(); ++geneIndex) {
+					if(random.nextFloat() < mutationRate) {//mutation happens
+						problemDomain.mutate(chromosome, geneIndex);
+					}
 				}
 			}
 		} while(problemDomain.endGeneration(fitnessResults));
 
+		//Find the best chromosome
+		ChromosomeFitnessPair<T> bestChromosome = null;
+		float maxScore = -Float.MAX_VALUE;
+		for(ChromosomeFitnessPair<T> pair: fitnessResults) {
+			float score = pair.getFitness();
+			if(score > maxScore) {
+				maxScore = score;
+				bestChromosome = pair;
+			}
+		}
 		return bestChromosome;
 	}
 

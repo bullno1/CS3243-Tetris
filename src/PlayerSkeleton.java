@@ -29,8 +29,7 @@ public class PlayerSkeleton {
 			executorService.shutdown();
 		}
 
-		System.out.println("You have completed " + s.getRowsCleared()
-				+ " rows.");
+		System.out.println("You have completed " + s.getRowsCleared() + " rows.");
 	}
 
 	public static final MoveEvaluator[] EVALUATORS;
@@ -64,8 +63,11 @@ public class PlayerSkeleton {
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool) {
 		this.mapReduce = new MapReduce(forkJoinPool);
-		float[] weights = new float[] { 587.5112f, 438.03345f, 474.9645f,
-				939.3418f, 408.60773f, 815.7669f };		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
+		float[] weights = new float[]
+		{ 446.273040771484375f, 129.36907958984375f, 274.052093505859375f, 583.1173095703125f, 271.36175537109375f, 590.993896484375f }
+		;
+		//{ 587.5112f, 438.03345f, 474.9645f,	939.3418f, 408.60773f, 815.7669f };
+		this.evaluator = new WeightedSumEvaluator(EVALUATORS, weights);
 	}
 
 	public PlayerSkeleton(ForkJoinPool forkJoinPool, float[] weights) {
@@ -74,13 +76,17 @@ public class PlayerSkeleton {
 	}
 
 	public int pickMove(State s, int[][] legalMoves) {
-		int piece = s.getNextPiece();
+		int nextPiece = s.getNextPiece();
 		ImmutableState currentState = new ImmutableState(s);
+		return pickMove(currentState, nextPiece, legalMoves);
+	}
+
+	public int pickMove(ImmutableState currentState, int nextPiece, int[][] legalMoves) {
 		possibleMoves.clear();
 		for (int moveIndex = 0; moveIndex < legalMoves.length; ++moveIndex) {
 			int orientation = legalMoves[moveIndex][0];
 			int position = legalMoves[moveIndex][1];
-			possibleMoves.add(new Move(currentState, moveIndex, piece,
+			possibleMoves.add(new Move(currentState, moveIndex, nextPiece,
 					orientation, position));
 		}
 
