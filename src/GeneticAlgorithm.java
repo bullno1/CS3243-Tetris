@@ -27,6 +27,7 @@ public class GeneticAlgorithm {
 
 		do {
 			//Evaluate fitness of population
+			problemDomain.beginGeneration();
 			mapReduce.map(fitnessFunction, population, fitnessResults);
 
 			//Create next generation
@@ -70,7 +71,7 @@ public class GeneticAlgorithm {
 					bestChromosome = pair;
 				}
 			}
-		} while(!problemDomain.canTerminate(fitnessResults));
+		} while(problemDomain.endGeneration(fitnessResults));
 
 		return bestChromosome;
 	}

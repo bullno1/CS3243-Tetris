@@ -45,10 +45,14 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 	}
 
 	@Override
-	public boolean canTerminate(Iterable<ChromosomeFitnessPair<WeightSet>> population) {
+	public void beginGeneration() {
+	}
+
+	@Override
+	public boolean endGeneration(Iterable<ChromosomeFitnessPair<WeightSet>> generation) {
 		float maxScore = -Float.MAX_VALUE;
 		ChromosomeFitnessPair<WeightSet> bestChromosome = null;
-		for(ChromosomeFitnessPair<WeightSet> pair: population) {
+		for(ChromosomeFitnessPair<WeightSet> pair: generation) {
 			float score = pair.getFitness();
 			if(score > maxScore) {
 				maxScore = score;
@@ -62,12 +66,12 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			System.out.println();
 			System.out.println("Score: " + bestScore);
 			printChromosome(bestChromosome);
-			return false;
+			return true;
 		}
 		else {
 			++numLostGenerations;
 			System.out.print(".");
-			return numLostGenerations > 20;
+			return numLostGenerations < 20;
 		}
 	}
 
@@ -148,7 +152,7 @@ class TetrisProblem implements ProblemDomain<WeightSet> {
 			return (float)state.getRowsCleared();
 		}
 	};
-	
+
 	private final PlayerSkeleton.ReduceFunc<Float, Float> PERCENTILE_SCORE = new PlayerSkeleton.ReduceFunc<Float, Float>() {
 		@Override
 		public Float reduce(Iterable<Float> inputs) {
