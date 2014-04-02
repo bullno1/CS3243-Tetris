@@ -1,2 +1,2 @@
 #!/bin/sh
-java -cp bin QuickRunner
+java -cp bin QuickRunner $*
