@@ -197,7 +197,7 @@
 
 
 
-\ProvidesClass{IEEEtran}[2012/11/21 V1.8c by Harald Hanche-Olsen and Anders Christensen]
+\ProvidesClass{IEEEtran_modified}[2012/11/21 V1.8c by Harald Hanche-Olsen and Anders Christensen]
 \typeout{-- Based on V1.7a by Michael Shell}
 \typeout{-- See the "IEEEtran_HOWTO" manual for usage information.}
 \typeout{-- http://www.michaelshell.org/tex/ieeetran/}
@@ -1650,8 +1650,8 @@
 \def\listtablename{List of Tables}
 \def\refname{References}
 \def\indexname{Index}
-\def\figurename{Fig.}
-\def\tablename{TABLE}
+\def\figurename{Figure}
+\def\tablename{Table}
 \@IEEEcompsocconfonly{\def\figurename{Figure}\def\tablename{Table}}
 \def\partname{Part}
 \def\appendixname{Appendix}
@@ -1846,7 +1846,7 @@
 \ifCLASSOPTIONcompsoc
 \def\thetable{\arabic{table}}
 \else
-\def\thetable{\@Roman\c@table}
+\def\thetable{\arabic{table}}
 \fi
 \def\fps@table{tbp}
 \def\ftype@table{2}
