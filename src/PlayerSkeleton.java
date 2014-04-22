@@ -179,6 +179,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Not in use
 	public static class NumWells implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult moveResult) {
@@ -202,6 +203,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Not in use
 	public static class DeepestWell implements MoveEvaluator {
 		public Float map(MoveResult moveResult) {
 			int maxDepth = Integer.MIN_VALUE;
@@ -229,6 +231,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Not in use
 	public static class MeanHeight implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -243,6 +246,7 @@ public class PlayerSkeleton {
 		}
 	}
 	
+	// Mean height difference, the average of the difference between the height of each column and the mean height of the state. 
 	public static class MeanHeightDifference implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -264,7 +268,7 @@ public class PlayerSkeleton {
 		}
 	}
 
-
+	//The maximum column height of the state.
 	public static class MaxColumnHeight implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -282,6 +286,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Number of rows cleared.
 	public static class NumRowsCleared implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult moveResult) {
@@ -289,6 +294,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Whether the move results in a loss or not.
 	public static class HasLost implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -296,6 +302,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Number of holes, a hole is an empty block with a non-empty block above it.
 	public static class NumFaults implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -314,6 +321,9 @@ public class PlayerSkeleton {
 			return -(float) numFaults * numFaultsWeight;
 		}
 	}
+
+	// Depth of pits, a pit is a column with adjacent columns higher by at least two blocks and the pit depth 
+	// is defined as the difference between the height of the pit column and the shortest adjacent column.	
 	public static class PitDepths implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -359,6 +369,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Sum of height difference between all pairs of adjacent columns.
 	public static class Roughness implements MoveEvaluator {
 		@Override
 		public Float map(MoveResult result) {
@@ -371,6 +382,7 @@ public class PlayerSkeleton {
 		}
 	}
 
+	// Not in use
 	public static class ColumnDiff implements MoveEvaluator {
 		public ColumnDiff(int columnA, int columnB) {
 			this.columnA = columnA;
